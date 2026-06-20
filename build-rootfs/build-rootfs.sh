@@ -107,6 +107,25 @@ cp /work/files/etc/init.d/podroid-hostd     "$ROOTFS/etc/init.d/"
 cp /work/files/etc/init.d/podroid-migrate   "$ROOTFS/etc/init.d/"
 chmod +x "$ROOTFS/etc/init.d/podroid-"*
 
+# iris-pod: the OpenRC init that runs the iris-messenger container inside
+# the Podroid VM. Source lives in /home/alca/projects/jrwl-messenger/
+# android/vm-image/overlay/etc/init.d/iris-pod (same overlay that builds
+# the iris-messenger-arm64-overlay.tar). Staged here so it ends up in
+# the squashfs at /etc/init.d/iris-pod.
+if [ -f /work/files/etc/init.d/iris-pod ]; then
+    cp /work/files/etc/init.d/iris-pod "$ROOTFS/etc/init.d/"
+    chmod +x "$ROOTFS/etc/init.d/iris-pod"
+fi
+if [ -f /work/files/usr/local/bin/iris-pod-start.sh ]; then
+    mkdir -p "$ROOTFS/usr/local/bin"
+    cp /work/files/usr/local/bin/iris-pod-start.sh "$ROOTFS/usr/local/bin/"
+    chmod +x "$ROOTFS/usr/local/bin/iris-pod-start.sh"
+fi
+if [ -d /work/files/etc/iris ]; then
+    mkdir -p "$ROOTFS/etc/iris"
+    cp -a /work/files/etc/iris/. "$ROOTFS/etc/iris/"
+fi
+
 # Copy /usr/local/bin scripts (resize daemon + login wrapper + getty selector)
 mkdir -p "$ROOTFS/usr/local/bin"
 cp /work/files/usr/local/bin/podroid-resize "$ROOTFS/usr/local/bin/"
@@ -185,7 +204,7 @@ mkdir -p "$ROOTFS/etc/runlevels/default" "$ROOTFS/etc/runlevels/boot"
 # Guard each link: a dangling symlink (e.g. dnsmasq.lxcbr0, which lxc-bridge
 # may ship only as dnsmasq config and not an init script) makes OpenRC log
 # an error every boot and stalls podroid-ready's `after *` on a phantom.
-for svc in podroid-migrate podroid-bootstrap podroid-network podroid-resize dropbear docker lxc dnsmasq.lxcbr0 podroid-x11 podroid-vsock podroid-hostd podroid-ready; do
+for svc in podroid-migrate podroid-bootstrap podroid-network podroid-resize dropbear docker lxc dnsmasq.lxcbr0 podroid-x11 podroid-vsock podroid-hostd podroid-ready iris-pod; do
     if [ -e "$ROOTFS/etc/init.d/$svc" ]; then
         ln -sf "/etc/init.d/$svc" "$ROOTFS/etc/runlevels/default/$svc"
     else
