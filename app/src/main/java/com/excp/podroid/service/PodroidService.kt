@@ -343,6 +343,19 @@ class PodroidService : Service() {
                         rules.add(com.excp.podroid.data.repository.PortForwardRule(X11Constants.AUDIO_PORT, X11Constants.AUDIO_PORT, "tcp", loopbackOnly = true))
                     }
 
+                    // Always-on iris-messenger pod forwards (REST 9091 + WS 9092).
+                    // loopbackOnly: the in-app iris client dials 127.0.0.1; the pod
+                    // serves plain HTTP (IRIS_TLS_ENABLED=false) with no auth on the
+                    // loopback hop, so binding 0.0.0.0 would expose the gateway to the
+                    // whole Wi-Fi. Seeding them here (not only via the runtime ctl ADD)
+                    // makes the messenger reachable on the very first VM boot.
+                    if (rules.none { it.hostPort == IRIS_REST_PORT }) {
+                        rules.add(com.excp.podroid.data.repository.PortForwardRule(IRIS_REST_PORT, IRIS_REST_PORT, "tcp", loopbackOnly = true))
+                    }
+                    if (rules.none { it.hostPort == IRIS_WS_PORT }) {
+                        rules.add(com.excp.podroid.data.repository.PortForwardRule(IRIS_WS_PORT, IRIS_WS_PORT, "tcp", loopbackOnly = true))
+                    }
+
                     val config = VmConfig(
                         ramMb = settingsRepository.getVmRamMbSnapshot(),
                         cpus = settingsRepository.getVmCpusSnapshot(),
@@ -521,6 +534,16 @@ class PodroidService : Service() {
         const val ACTION_START   = "com.excp.podroid.action.START"
         const val ACTION_STOP    = "com.excp.podroid.action.STOP"
         const val SSH_HOST_PORT  = 9922
+
+        // iris-messenger pod ports. The pod (localhost/iris-messenger:arm64) binds
+        // 9091 (REST/UI) + 9092 (WS) inside the guest via --network=host; the
+        // in-app iris client dials 127.0.0.1:9091. Seed these as always-on
+        // loopback forwards so the messenger reaches the pod on the FIRST boot,
+        // independent of the cold-start race (the from-source pod's ~6min podman
+        // load under TCG used to blow past the app's runtime ctl-channel ADD).
+        // Mirrors the X11 VNC/AUDIO always-on pattern below.
+        const val IRIS_REST_PORT = 9091
+        const val IRIS_WS_PORT   = 9092
 
         fun start(context: Context) {
             val intent = Intent(context, PodroidService::class.java).apply {
