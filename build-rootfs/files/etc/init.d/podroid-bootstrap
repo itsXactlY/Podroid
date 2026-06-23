@@ -44,6 +44,27 @@ start() {
     depmod -a 2>/dev/null
     for m in 9p 9pnet 9pnet_virtio; do modprobe "$m" 2>/dev/null; done
 
+    # binfmt_misc: lets rootless podman run amd64 container images
+    # (iris-messenger .bin is x86_64) via user-mode qemu-x86_64-static
+    # emulation. Mount the fs, then register the interpreter.
+    if [ -d /proc/sys/fs/binfmt_misc ] && ! mountpoint -q /proc/sys/fs/binfmt_misc; then
+        mount -t binfmt_misc binfmt_misc /proc/sys/fs/binfmt_misc 2>/dev/null
+    fi
+    if [ -f /proc/sys/fs/binfmt_misc/status ] && \
+       [ -x /usr/bin/qemu-x86_64 ] && \
+       [ ! -f /proc/sys/fs/binfmt_misc/qemu-x86_64 ]; then
+        # Magic: ELF64 LSB executable, machine EM_X86_64=0x3e, with the OS/ABI
+        # field zeroed so it matches any glibc/musl build.
+        # Flags O (open-by-fd-at-clone) + C (credentials) + F (fix-binary) so
+        # the kernel keeps the registered binary open across forks, which
+        # avoids the "exec failed: No such file" race some crun versions hit
+        # when a child process tries to launch a new interpreter before the
+        # parent's exec settles.
+        printf ':qemu-x86_64:M::\\x7fELF\\x02\\x01\\x01\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x02\\x00\\x3e\\x00:\\xff\\xff\\xff\\xff\\xff\\xff\\xff\\x00\\xff\\xff\\xff\\xff\\xff\\xff\\xff\\xff\\xfe\\xff\\xff\\xff:/usr/bin/qemu-x86_64:OCF\n' \
+            > /proc/sys/fs/binfmt_misc/register 2>/dev/null \
+            && einfo "Registered qemu-x86_64 binfmt_misc (amd64 user-mode emulation)"
+    fi
+
     # I/O scheduler — kernel cmdline `elevator=` was deprecated in Linux 5.0,
     # so set per-device via sysfs. mq-deadline is what overlay/ext4 prefers
     # under random-write loads (Podman/Docker graph driver).

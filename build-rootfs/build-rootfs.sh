@@ -48,6 +48,12 @@ apk -X "https://dl-cdn.alpinelinux.org/alpine/v${ALPINE_BRANCH}/main" \
     font-cursor-misc \
     ttf-dejavu
 
+# User-mode x86_64 emulation: lets rootless podman run amd64 container
+# images (the iris-messenger .bin is built x86_64-only on the host).
+# binfmt_misc registration happens in podroid-bootstrap at VM boot.
+apk -X "https://dl-cdn.alpinelinux.org/alpine/v${ALPINE_BRANCH}/community" \
+    -U --allow-untrusted --root "$ROOTFS" add qemu-x86_64
+
 # Apply file capabilities to newuidmap/newgidmap. apk's package install often
 # does this, but we set them explicitly so the squashfs ships with the
 # correct security.capability xattr (preserved by mksquashfs without -no-xattrs).
@@ -124,6 +130,31 @@ fi
 if [ -d /work/files/etc/iris ]; then
     mkdir -p "$ROOTFS/etc/iris"
     cp -a /work/files/etc/iris/. "$ROOTFS/etc/iris/"
+fi
+# Vendor tarball of the iris-messenger container image (the obfuscated .bin
+# wrapped in a minimal scratch container). iris-pod's start_pre() loads this
+# via `podman load -i` if `localhost/iris-messenger:amd64` is not already
+# present. Sourced from /home/alca/projects/jrwl-messenger/build-podman-image.sh
+# on the host, then mirrored into the Podroid APK assets at
+# app/src/main/assets/iris-messenger/iris-messenger-amd64.tar.
+if [ -f /work/files/usr/local/share/iris/iris-messenger-arm64.tar ]; then
+    mkdir -p "$ROOTFS/usr/local/share/iris"
+    cp /work/files/usr/local/share/iris/iris-messenger-arm64.tar \
+       "$ROOTFS/usr/local/share/iris/iris-messenger-arm64.tar"
+    chmod 0644 "$ROOTFS/usr/local/share/iris/iris-messenger-arm64.tar"
+fi
+if [ -f /work/files/usr/local/share/iris/iris-messenger-amd64.tar ]; then
+    mkdir -p "$ROOTFS/usr/local/share/iris"
+    cp /work/files/usr/local/share/iris/iris-messenger-amd64.tar \
+       "$ROOTFS/usr/local/share/iris/iris-messenger-amd64.tar"
+    chmod 0644 "$ROOTFS/usr/local/share/iris/iris-messenger-amd64.tar"
+    einfo() { :; }  # noop outside OpenRC runlevel context
+    einfo "Seeded /usr/local/share/iris/iris-messenger-amd64.tar (vendor tarball)"
+fi
+if [ -f /work/files/usr/local/share/iris/iris-messenger.bin ]; then
+    cp /work/files/usr/local/share/iris/iris-messenger.bin \
+       "$ROOTFS/usr/local/share/iris/iris-messenger.bin" 2>/dev/null || true
+    chmod 0644 "$ROOTFS/usr/local/share/iris/iris-messenger.bin" 2>/dev/null || true
 fi
 
 # Copy /usr/local/bin scripts (resize daemon + login wrapper + getty selector)

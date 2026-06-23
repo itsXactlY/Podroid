@@ -16,6 +16,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.SystemUpdate
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -95,30 +96,91 @@ fun HomeScreen(
     }
 
     updateInfo?.let { info ->
+        val updateAction by viewModel.updateAction.collectAsStateWithLifecycle()
+        val downloading = updateAction as? HomeViewModel.UpdateAction.Downloading
+        val hasApk = info.apkUrl != null
+
+        // Open the release page in a browser — the fallback when a release has no
+        // APK asset, or when the user prefers the manual route.
+        val openReleasePage = {
+            runCatching {
+                context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(info.releaseUrl)))
+            }.onFailure {
+                android.widget.Toast.makeText(
+                    context,
+                    context.getString(R.string.update_open_failed),
+                    android.widget.Toast.LENGTH_LONG,
+                ).show()
+            }
+            Unit
+        }
+
         AlertDialog(
-            onDismissRequest = { viewModel.dismissUpdate() },
+            // Don't let an outside tap cancel a download in flight.
+            onDismissRequest = { if (downloading == null) viewModel.dismissUpdate() },
             icon  = { Icon(Icons.Default.SystemUpdate, contentDescription = null) },
             title = { Text(stringResource(R.string.update_available)) },
-            text  = { Text(stringResource(R.string.version_available, info.latestVersion, BuildConfig.VERSION_NAME)) },
-            confirmButton = {
-                TextButton(onClick = {
-                    // Guard against ActivityNotFoundException (no browser) or a
-                    // blank/malformed releaseUrl from the remote JSON source.
-                    // Surface a toast on failure so the tap isn't a silent no-op.
-                    runCatching {
-                        context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(info.releaseUrl)))
-                    }.onFailure {
-                        android.widget.Toast.makeText(
-                            context,
-                            context.getString(R.string.update_open_failed),
-                            android.widget.Toast.LENGTH_LONG,
-                        ).show()
+            text  = {
+                Column {
+                    Text(stringResource(R.string.version_available, info.latestVersion, BuildConfig.VERSION_NAME))
+                    when (val a = updateAction) {
+                        is HomeViewModel.UpdateAction.Downloading -> {
+                            Spacer(Modifier.height(12.dp))
+                            LinearProgressIndicator(
+                                progress = { a.progress },
+                                modifier = Modifier.fillMaxWidth(),
+                            )
+                            Spacer(Modifier.height(4.dp))
+                            Text(stringResource(R.string.update_downloading, (a.progress * 100).toInt()))
+                        }
+                        HomeViewModel.UpdateAction.NeedsInstallPermission -> {
+                            Spacer(Modifier.height(8.dp))
+                            Text(stringResource(R.string.update_needs_install_permission))
+                        }
+                        HomeViewModel.UpdateAction.Failed -> {
+                            Spacer(Modifier.height(8.dp))
+                            Text(stringResource(R.string.update_install_failed))
+                        }
+                        else -> {}
                     }
-                    viewModel.dismissUpdate()
-                }) { Text(stringResource(R.string.download)) }
+                }
+            },
+            confirmButton = {
+                when (updateAction) {
+                    is HomeViewModel.UpdateAction.Downloading -> {
+                        TextButton(onClick = {}, enabled = false) {
+                            Text(stringResource(R.string.update_downloading_short))
+                        }
+                    }
+                    HomeViewModel.UpdateAction.NeedsInstallPermission -> {
+                        TextButton(onClick = { viewModel.openInstallPermissionSettings() }) {
+                            Text(stringResource(R.string.update_grant_permission))
+                        }
+                    }
+                    HomeViewModel.UpdateAction.Failed -> {
+                        // Offer the manual route after an in-app failure.
+                        TextButton(onClick = { openReleasePage(); viewModel.dismissUpdate() }) {
+                            Text(stringResource(R.string.update_open_page))
+                        }
+                    }
+                    else -> {
+                        // Idle: one-tap in-app install when an APK asset exists,
+                        // else fall back to opening the release page.
+                        TextButton(onClick = {
+                            if (hasApk) viewModel.downloadAndInstallUpdate()
+                            else { openReleasePage(); viewModel.dismissUpdate() }
+                        }) {
+                            Text(stringResource(
+                                if (hasApk) R.string.update_download_install else R.string.download
+                            ))
+                        }
+                    }
+                }
             },
             dismissButton = {
-                TextButton(onClick = { viewModel.dismissUpdate() }) { Text(stringResource(R.string.later)) }
+                if (downloading == null) {
+                    TextButton(onClick = { viewModel.dismissUpdate() }) { Text(stringResource(R.string.later)) }
+                }
             },
         )
     }

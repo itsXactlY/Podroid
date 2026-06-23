@@ -125,6 +125,13 @@
     <string name="update_available">Update available</string>
     <string name="version_available">Version %1$s is available. You have %2$s.</string>
     <string name="update_open_failed">Couldn\'t open the download page. No browser available?</string>
+    <string name="update_download_install">Download &amp; Install</string>
+    <string name="update_downloading">Downloading… %1$d%%</string>
+    <string name="update_downloading_short">Downloading…</string>
+    <string name="update_needs_install_permission">To update in-app, allow this app to install apps.</string>
+    <string name="update_grant_permission">Open settings</string>
+    <string name="update_install_failed">Download failed. Try the release page instead.</string>
+    <string name="update_open_page">Open release page</string>
 
     <!-- Language -->
     <string name="language_label">Language</string>

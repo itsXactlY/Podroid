@@ -31,6 +31,10 @@
     <!-- Required on Android 13+ to show the foreground service notification -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
 
+    <!-- In-app self-updater: download the latest combined APK from GitHub
+         Releases and hand it to the system package installer. -->
+    <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
+
     <!-- Full storage access to share the Downloads folder with the VM -->
     <uses-permission android:name="android.permission.MANAGE_EXTERNAL_STORAGE"
         tools:ignore="ScopedStorage" />

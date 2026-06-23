@@ -189,7 +189,7 @@ RUN chmod +x /init
 RUN rm -rf /var/cache/apk/* /tmp/* /var/tmp/* /usr/share/man /usr/share/doc
 
 # Stage 3: Pack Initramfs
-FROM alpine:3.23 AS packer
+FROM docker.io/alpine:3.23 AS packer
 RUN apk add --no-cache cpio gzip findutils
 COPY --from=kernel-builder /output/vmlinuz-virt /output/vmlinuz-virt
 COPY --from=rootfs-builder / /rootfs/

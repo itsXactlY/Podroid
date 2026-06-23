@@ -28,6 +28,9 @@ android {
         versionCode = 28
         versionName = "1.2.5"
         buildConfigField("String", "QEMU_VERSION", "\"$podroidQemuVersion\"")
+        // GitHub repo (owner/name) the in-app self-updater pulls releases from.
+        // The combined Iris+Podroid APK is published here as a release asset.
+        buildConfigField("String", "UPDATE_REPO", "\"itsXactlY/Iris-Messenger\"")
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 

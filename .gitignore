@@ -75,3 +75,8 @@ app/src/main/jniLibs/
 
 # Visual companion (brainstorming sessions)
 .superpowers/
+
+# Build artifacts — iris pod image tars staged during the build (regenerated,
+# 100s of MB; never commit). build-all.sh / build-podman-image.sh produce these.
+/_staging-iris-tars/
+/build-rootfs/files/usr/local/share/

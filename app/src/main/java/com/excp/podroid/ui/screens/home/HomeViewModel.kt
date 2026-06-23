@@ -215,7 +215,65 @@ class HomeViewModel @Inject constructor(
     fun dismissUpdate() {
         val version = _updateInfo.value?.latestVersion ?: return
         _updateInfo.value = null
+        _updateAction.value = UpdateAction.Idle
         viewModelScope.launch { updateRepository.dismissUpdate(version) }
+    }
+
+    /** Progress/branch state for the in-app "Download & Install" flow. */
+    sealed interface UpdateAction {
+        data object Idle : UpdateAction
+        data class Downloading(val progress: Float) : UpdateAction
+        /** OS blocks installs from this app until the user grants "install unknown apps". */
+        data object NeedsInstallPermission : UpdateAction
+        data object Failed : UpdateAction
+    }
+
+    private val _updateAction = MutableStateFlow<UpdateAction>(UpdateAction.Idle)
+    val updateAction: StateFlow<UpdateAction> = _updateAction.asStateFlow()
+
+    /**
+     * Download the release APK (with progress) and hand it to the system
+     * installer. If the OS hasn't granted "install unknown apps" to this app,
+     * surfaces [UpdateAction.NeedsInstallPermission] so the UI can route to
+     * settings instead.
+     */
+    fun downloadAndInstallUpdate() {
+        val info = _updateInfo.value ?: return
+        if (info.apkUrl == null) return // UI falls back to opening the release page
+        if (!updateRepository.canInstallPackages()) {
+            _updateAction.value = UpdateAction.NeedsInstallPermission
+            return
+        }
+        viewModelScope.launch {
+            _updateAction.value = UpdateAction.Downloading(0f)
+            try {
+                val file = updateRepository.downloadApk(info) { p ->
+                    _updateAction.value = UpdateAction.Downloading(p)
+                }
+                if (file == null) {
+                    _updateAction.value = UpdateAction.Failed
+                    return@launch
+                }
+                val launched = updateRepository.installApk(file)
+                _updateAction.value = if (launched) UpdateAction.Idle else UpdateAction.Failed
+            } catch (c: kotlinx.coroutines.CancellationException) {
+                _updateAction.value = UpdateAction.Idle
+                throw c
+            } catch (e: Exception) {
+                android.util.Log.w("HomeViewModel", "download/install failed", e)
+                _updateAction.value = UpdateAction.Failed
+            }
+        }
+    }
+
+    /** Send the user to grant "install unknown apps" for this app, then reset. */
+    fun openInstallPermissionSettings() {
+        runCatching { context.startActivity(updateRepository.unknownSourcesSettingsIntent()) }
+        _updateAction.value = UpdateAction.Idle
+    }
+
+    fun resetUpdateAction() {
+        _updateAction.value = UpdateAction.Idle
     }
 
     fun dismissAvfHint() {

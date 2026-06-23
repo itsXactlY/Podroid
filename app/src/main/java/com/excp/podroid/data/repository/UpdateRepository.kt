@@ -1,12 +1,18 @@
 package com.excp.podroid.data.repository
 
 import android.content.Context
+import android.content.Intent
+import android.net.Uri
+import android.provider.Settings
+import androidx.core.content.FileProvider
+import com.excp.podroid.BuildConfig
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.emptyPreferences
 import androidx.datastore.preferences.core.longPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.withContext
@@ -18,6 +24,13 @@ import javax.inject.Singleton
 data class UpdateInfo(
     val latestVersion: String,
     val releaseUrl: String,
+    /** Direct download URL of the release's `.apk` asset, or null if the
+     *  release has no APK attached (then the UI falls back to opening
+     *  [releaseUrl] in a browser). */
+    val apkUrl: String? = null,
+    /** Size in bytes of the APK asset (0 when unknown) — used for the
+     *  download progress bar. */
+    val apkSize: Long = 0L,
 )
 
 /**
@@ -115,7 +128,14 @@ class UpdateRepository @Inject constructor(
     private val lastCheckKey = longPreferencesKey("update_check_timestamp")
     private val cacheValidityMs = 24 * 60 * 60 * 1000L
 
-    suspend fun checkForUpdate(currentVersion: String): UpdateInfo? = withContext(Dispatchers.IO) {
+    /**
+     * @param force when true, bypass the 24h cache gate (for an explicit
+     *   user-initiated "check now"). Automatic launch checks pass false.
+     */
+    suspend fun checkForUpdate(
+        currentVersion: String,
+        force: Boolean = false,
+    ): UpdateInfo? = withContext(Dispatchers.IO) {
         // Wall-clock time so the 24h gate survives device reboots and deep sleep.
         val now = System.currentTimeMillis()
         var connection: java.net.HttpURLConnection? = null
@@ -124,11 +144,11 @@ class UpdateRepository @Inject constructor(
                 .catch { e -> if (e is java.io.IOException) emit(emptyPreferences()) else throw e }
                 .first()[lastCheckKey] ?: 0L
 
-            if (!shouldCheck(now, lastCheck, cacheValidityMs)) {
+            if (!force && !shouldCheck(now, lastCheck, cacheValidityMs)) {
                 return@withContext null
             }
 
-            connection = URL("https://api.github.com/repos/ExTV/Podroid/releases/latest")
+            connection = URL("https://api.github.com/repos/${BuildConfig.UPDATE_REPO}/releases/latest")
                 .openConnection() as java.net.HttpURLConnection
             connection.connectTimeout = 5000
             connection.readTimeout = 5000
@@ -153,12 +173,30 @@ class UpdateRepository @Inject constructor(
                 return@withContext null
             }
 
+            // Find the first `.apk` release asset for one-tap in-app install.
+            // Absent (source-only release) → apkUrl stays null and the UI opens
+            // the release page instead.
+            var apkUrl: String? = null
+            var apkSize = 0L
+            val assets = obj.optJSONArray("assets")
+            if (assets != null) {
+                for (i in 0 until assets.length()) {
+                    val a = assets.optJSONObject(i) ?: continue
+                    val name = a.optString("name", "")
+                    if (name.endsWith(".apk", ignoreCase = true)) {
+                        apkUrl = a.optString("browser_download_url", "").ifEmpty { null }
+                        apkSize = a.optLong("size", 0L)
+                        if (apkUrl != null) break
+                    }
+                }
+            }
+
             context.dataStore.edit { it[lastCheckKey] = now }
 
             // Build-type suffix (`-debug`) is decoration, not a prerelease — strip it so
             // 1.1.7-debug compares equal to the 1.1.7 release tag instead of "older".
             val normalizedCurrent = currentVersion.removeSuffix("-debug")
-            if (isNewer(tag, normalizedCurrent)) UpdateInfo(tag, url) else null
+            if (isNewer(tag, normalizedCurrent)) UpdateInfo(tag, url, apkUrl, apkSize) else null
         } catch (c: kotlinx.coroutines.CancellationException) {
             // Coroutine cancellation is not a check failure — don't record a
             // timestamp (which would back off a check the user may retry) and
@@ -187,5 +225,96 @@ class UpdateRepository @Inject constructor(
 
     suspend fun dismissUpdate(version: String) {
         context.dataStore.edit { it[dismissedKey] = version }
+    }
+
+    /** True if the OS will let us launch a package-install intent without first
+     *  sending the user to "install unknown apps" settings. */
+    fun canInstallPackages(): Boolean = context.packageManager.canRequestPackageInstalls()
+
+    /** Intent that takes the user to grant "install unknown apps" for THIS app.
+     *  Caller starts it (with FLAG_ACTIVITY_NEW_TASK from a non-Activity ctx). */
+    fun unknownSourcesSettingsIntent(): Intent =
+        Intent(Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES, Uri.parse("package:${context.packageName}"))
+            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+
+    /**
+     * Download the release APK to a private, FileProvider-shareable location.
+     * Streams with progress (0f..1f) and is cancellation-aware. Returns the
+     * downloaded [java.io.File], or null on any failure. Each call overwrites
+     * the previous download so stale APKs never accumulate.
+     */
+    suspend fun downloadApk(
+        info: UpdateInfo,
+        onProgress: (Float) -> Unit = {},
+    ): java.io.File? = withContext(Dispatchers.IO) {
+        val apkUrl = info.apkUrl ?: return@withContext null
+        var connection: java.net.HttpURLConnection? = null
+        val dir = java.io.File(context.filesDir, "updates").apply { mkdirs() }
+        val out = java.io.File(dir, "iris-update.apk")
+        val tmp = java.io.File(dir, "iris-update.apk.part")
+        try {
+            connection = URL(apkUrl).openConnection() as java.net.HttpURLConnection
+            connection.connectTimeout = 10000
+            connection.readTimeout = 30000
+            connection.instanceFollowRedirects = true
+            if (connection.responseCode !in 200..299) {
+                runCatching { connection.errorStream?.close() }
+                return@withContext null
+            }
+            val total = if (info.apkSize > 0) info.apkSize else connection.contentLengthLong
+            tmp.delete()
+            connection.inputStream.use { input ->
+                tmp.outputStream().use { sink ->
+                    val buf = ByteArray(64 * 1024)
+                    var read: Int
+                    var done = 0L
+                    while (input.read(buf).also { read = it } >= 0) {
+                        // Cooperative cancellation: throws CancellationException if
+                        // the caller's coroutine was cancelled (e.g. screen left).
+                        coroutineContext.ensureActive()
+                        sink.write(buf, 0, read)
+                        done += read
+                        if (total > 0) onProgress((done.toFloat() / total).coerceIn(0f, 1f))
+                    }
+                    sink.flush()
+                }
+            }
+            // Atomic-ish publish: only a fully-written file becomes the install target.
+            if (out.exists()) out.delete()
+            if (!tmp.renameTo(out)) {
+                tmp.copyTo(out, overwrite = true); tmp.delete()
+            }
+            onProgress(1f)
+            out
+        } catch (c: kotlinx.coroutines.CancellationException) {
+            runCatching { tmp.delete() }
+            throw c
+        } catch (e: Exception) {
+            android.util.Log.w("UpdateRepository", "apk download failed", e)
+            runCatching { tmp.delete() }
+            null
+        } finally {
+            connection?.disconnect()
+        }
+    }
+
+    /**
+     * Hand a downloaded APK to the system package installer. Android requires
+     * the new APK to carry the SAME signing key + applicationId and a higher
+     * versionCode to update in place; the system installer enforces that and
+     * shows the standard confirm dialog. Returns false if the intent couldn't
+     * be launched.
+     */
+    fun installApk(file: java.io.File): Boolean = try {
+        val uri = FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", file)
+        val intent = Intent(Intent.ACTION_VIEW).apply {
+            setDataAndType(uri, "application/vnd.android.package-archive")
+            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_GRANT_READ_URI_PERMISSION)
+        }
+        context.startActivity(intent)
+        true
+    } catch (e: Exception) {
+        android.util.Log.w("UpdateRepository", "install intent failed", e)
+        false
     }
 }

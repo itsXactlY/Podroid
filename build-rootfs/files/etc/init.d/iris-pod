@@ -23,10 +23,11 @@ name="iris-pod"
 description="Iris Messenger pod (rootless container on Podroid)"
 
 # Image name (must match the local-loaded image produced by
-# build-podman-image.sh on the iris-messenger side). The tarball inside
-# the Podroid APK is amd64 for now (host is amd64; cross to arm64 needs
-# sudo + aarch64-linux-gnu-gcc OR a native arm64 build host).
-IRIS_IMAGE="${IRIS_IMAGE:-localhost/iris-messenger:amd64}"
+# build-podman-image.sh on the iris-messenger side). The arm64 vendor
+# tarball is the slim Nuitka --onefile build (24 MB, tag :arm64, see
+# Containerfile.nuitka-arm64) — small enough to load in the 512 MB VM,
+# unlike the heavy from-source image. start_pre prefers the arm64 tar.
+IRIS_IMAGE="${IRIS_IMAGE:-localhost/iris-messenger:arm64}"
 IRIS_CONTAINER_NAME="${IRIS_CONTAINER_NAME:-iris-messenger}"
 
 # Where persistent state lives (overlaid on the ext4 persistent volume
@@ -66,8 +67,11 @@ start_pre() {
     # minimal scratch container with glibc; podroid-podman runs it
     # directly. ARM64 is a TODO — see build-podman-image.sh.
     if ! podman image exists "${IRIS_IMAGE}" 2>/dev/null; then
-        if [ -f /usr/local/share/iris/iris-messenger-amd64.tar ]; then
-            einfo "Loading iris-messenger image from vendor tarball (the .bin)"
+        if [ -f /usr/local/share/iris/iris-messenger-arm64.tar ]; then
+            einfo "Loading iris-messenger arm64 image (native, no x86 emulation)"
+            podman load -i /usr/local/share/iris/iris-messenger-arm64.tar
+        elif [ -f /usr/local/share/iris/iris-messenger-amd64.tar ]; then
+            einfo "Loading iris-messenger amd64 image (x86_64 user-emulated)"
             podman load -i /usr/local/share/iris/iris-messenger-amd64.tar
         else
             eerror "iris-messenger image not present and no vendor tarball found"
