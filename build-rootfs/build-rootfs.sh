@@ -39,6 +39,7 @@ apk -X "https://dl-cdn.alpinelinux.org/alpine/v${ALPINE_BRANCH}/main" \
     libcap-utils \
     doas sudo \
     gcompat \
+    python3 \
     gzip \
     xz \
     tigervnc \
@@ -113,6 +114,20 @@ cp /work/files/etc/init.d/podroid-hostd     "$ROOTFS/etc/init.d/"
 cp /work/files/etc/init.d/podroid-migrate   "$ROOTFS/etc/init.d/"
 chmod +x "$ROOTFS/etc/init.d/podroid-"*
 
+# hermes-agent pod (B): OpenRC init that runs the native Python Hermes Agent
+# gateway inside the Podroid VM on guest :8088. Seeded venv lands at
+# /opt/hermes via the vendor tarball block below; this just installs the script.
+if [ -f /work/files/etc/init.d/podroid-hermes ]; then
+    cp /work/files/etc/init.d/podroid-hermes "$ROOTFS/etc/init.d/"
+    chmod +x "$ROOTFS/etc/init.d/podroid-hermes"
+fi
+
+# podroid-hermes-mcp: wires guest hermes to mazemaker via the app MCP proxy
+if [ -f /work/files/etc/init.d/podroid-hermes-mcp ]; then
+    cp /work/files/etc/init.d/podroid-hermes-mcp "$ROOTFS/etc/init.d/"
+    chmod +x "$ROOTFS/etc/init.d/podroid-hermes-mcp"
+fi
+
 # iris-pod: the OpenRC init that runs the iris-messenger container inside
 # the Podroid VM. Source lives in /home/alca/projects/jrwl-messenger/
 # android/vm-image/overlay/etc/init.d/iris-pod (same overlay that builds
@@ -155,6 +170,33 @@ if [ -f /work/files/usr/local/share/iris/iris-messenger.bin ]; then
     cp /work/files/usr/local/share/iris/iris-messenger.bin \
        "$ROOTFS/usr/local/share/iris/iris-messenger.bin" 2>/dev/null || true
     chmod 0644 "$ROOTFS/usr/local/share/iris/iris-messenger.bin" 2>/dev/null || true
+fi
+
+# hermes-agent pod (B): seed the native Python venv at /opt/hermes from a
+# vendor tarball produced by the podroid-hermes build (build_rootfs_native.sh
+# on the host). The tarball stores paths relative to / (opt/hermes/...), so
+# `tar -C $ROOTFS -xf` drops it straight into place. Mirrors the iris-pod
+# vendor-tarball pattern. If absent, podroid-hermes still installs but
+# start_pre() refuses to start until the venv is seeded.
+if [ -f /work/files/usr/local/share/hermes/hermes-podroid.tar ]; then
+    mkdir -p "$ROOTFS/opt/hermes"
+    tar -xf /work/files/usr/local/share/hermes/hermes-podroid.tar -C "$ROOTFS"
+    chmod +x "$ROOTFS/opt/hermes/start.sh" 2>/dev/null || true
+    chmod +x "$ROOTFS/opt/hermes/hermes-agent.bin" 2>/dev/null || true
+    # override the tarball start.sh with the repo copy (per-install key gen,
+    # no baked secret) + seed the LLM config template (empty api_key).
+    if [ -f /work/files/opt/hermes/start.sh ]; then
+        cp /work/files/opt/hermes/start.sh "$ROOTFS/opt/hermes/start.sh"
+        chmod +x "$ROOTFS/opt/hermes/start.sh"
+    fi
+    if [ -f /work/files/opt/hermes/config.template.yaml ]; then
+        cp /work/files/opt/hermes/config.template.yaml "$ROOTFS/opt/hermes/config.template.yaml"
+    fi
+    # seed the mazemaker MCP watcher alongside the venv (added on top of the tarball)
+    if [ -f /work/files/opt/hermes/mcp-mazemaker-watch.sh ]; then
+        cp /work/files/opt/hermes/mcp-mazemaker-watch.sh "$ROOTFS/opt/hermes/"
+        chmod +x "$ROOTFS/opt/hermes/mcp-mazemaker-watch.sh"
+    fi
 fi
 
 # Copy /usr/local/bin scripts (resize daemon + login wrapper + getty selector)
@@ -235,7 +277,7 @@ mkdir -p "$ROOTFS/etc/runlevels/default" "$ROOTFS/etc/runlevels/boot"
 # Guard each link: a dangling symlink (e.g. dnsmasq.lxcbr0, which lxc-bridge
 # may ship only as dnsmasq config and not an init script) makes OpenRC log
 # an error every boot and stalls podroid-ready's `after *` on a phantom.
-for svc in podroid-migrate podroid-bootstrap podroid-network podroid-resize dropbear docker lxc dnsmasq.lxcbr0 podroid-x11 podroid-vsock podroid-hostd podroid-ready iris-pod; do
+for svc in podroid-migrate podroid-bootstrap podroid-network podroid-resize dropbear docker lxc dnsmasq.lxcbr0 podroid-x11 podroid-vsock podroid-hostd podroid-ready iris-pod podroid-hermes podroid-hermes-mcp; do
     if [ -e "$ROOTFS/etc/init.d/$svc" ]; then
         ln -sf "/etc/init.d/$svc" "$ROOTFS/etc/runlevels/default/$svc"
     else

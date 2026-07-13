@@ -1,0 +1,42 @@
+#!/sbin/openrc-run
+# ────────────────────────────────────────────────────────────────────
+# podroid-hermes-mcp — wires the guest Hermes Agent to the operator's
+# mazemaker memory, with NO hardcoded IP.
+#
+# The mazemaker Android app (dev.mazemaker.mobile) runs an MCP proxy bound to
+# the AVF/CrosVM TAP interface on port 8790, forwarding MCP JSON-RPC to the
+# operator's desktop mazemaker pod through the QR-paired token+AES+TLS gateway
+# (cmd:pod). From the guest, that proxy sits at the guest's OWN default gateway
+# (the TAP host), so the URL is resolved at runtime — nothing is baked.
+#
+# This service:
+#   - seeds mcp_servers.mazemaker into Hermes' config.yaml (URL from the live
+#     default gateway + the shared port 8790), and
+#   - restarts podroid-hermes once whenever the proxy becomes reachable but
+#     Hermes has not loaded the mazemaker tools — because Hermes only retries an
+#     MCP server 3x at startup then gives up for the session, and the proxy only
+#     exists while the app is open (which may be after the pod boots).
+#
+# Hermes chat works without this (OpenRouter upstream); the mazemaker memory is
+# the bonus that lights up when the app is open. So this never blocks Hermes.
+# ────────────────────────────────────────────────────────────────────
+
+name="podroid-hermes-mcp"
+description="Wire Hermes to mazemaker via the app's on-device MCP proxy"
+
+command="/opt/hermes/mcp-mazemaker-watch.sh"
+command_background="yes"
+pidfile="/run/${name}.pid"
+start_stop_daemon_args="--background --make-pidfile --pidfile ${pidfile}"
+
+depend() {
+    need net
+    after podroid-network podroid-hermes
+}
+
+start_pre() {
+    if [ ! -x /opt/hermes/mcp-mazemaker-watch.sh ]; then
+        eerror "mcp-mazemaker-watch.sh missing at /opt/hermes/ — seed it first"
+        return 1
+    fi
+}

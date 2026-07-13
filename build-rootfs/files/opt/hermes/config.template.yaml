@@ -1,0 +1,18 @@
+# hermes LLM config — the OpenRouter upstream for the on-device pod.
+# Paste your OpenRouter API key below (sk-or-...) or via the mazemaker app's
+# Settings. NO KEY SHIPS IN THE IMAGE.
+model:
+  provider: openrouter_free
+  default: tencent/hy3:free
+  context_length: 256000
+providers:
+  openrouter_free:
+    type: custom
+    base_url: https://openrouter.ai/api/v1
+    api_key: ""
+    default_model: tencent/hy3:free
+    models:
+    - tencent/hy3:free
+    extra_body:
+      provider:
+        allow_fallbacks: true

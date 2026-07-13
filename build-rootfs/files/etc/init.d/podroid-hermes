@@ -1,0 +1,42 @@
+#!/sbin/openrc-run
+# ────────────────────────────────────────────────────────────────────
+# podroid-hermes — OpenRC init script for the Hermes Agent gateway
+# running INSIDE the Podroid Alpine VM.
+#
+# This file lives at /etc/init.d/podroid-hermes inside the guest. Podroid's
+# build-rootfs overlay mechanism (android/podroid/build-rootfs/files/) makes
+# it trivial to inject custom init scripts into the squashfs — the exact
+# pattern iris-pod uses for iris-messenger.
+#
+# Lifecycle:
+#   - start:  run /opt/hermes/start.sh, which exports API_SERVER_* and execs
+#             `/opt/hermes/venv/bin/hermes gateway run` on 0.0.0.0:8088.
+#   - stop:   s-s-d kills the hermes process (pidfile /run/podroid-hermes.pid).
+#   - status: pgrep -f "hermes gateway run"
+#
+# The Hermes gateway answers HTTP on the guest's :8088. PodroidService adds
+# an implicit loopback-only port forward (host 127.0.0.1:8088 → guest :8088)
+# so the Android-side client (mazemaker app) reaches it at 127.0.0.1:8088
+# without crossing the LAN.
+# ────────────────────────────────────────────────────────────────────
+
+name="podroid-hermes"
+description="Hermes Agent gateway (native Python pod on Podroid)"
+
+command="/opt/hermes/start.sh"
+command_background="yes"
+pidfile="/run/${name}.pid"
+start_stop_daemon_args="--background --make-pidfile --pidfile ${pidfile}"
+
+depend() {
+    need net
+    after podroid-network podroid-bootstrap
+}
+
+start_pre() {
+    if [ ! -x /opt/hermes/start.sh ]; then
+        eerror "hermes start.sh missing at /opt/hermes/start.sh — seed the venv first"
+        return 1
+    fi
+    mkdir -p /opt/hermes/hermes-agent-data
+}

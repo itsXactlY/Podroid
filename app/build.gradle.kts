@@ -21,6 +21,13 @@ android {
         }
     }
 
+    // Store large pre-compressed binary assets uncompressed. AAPT2 would
+    // otherwise re-deflate them (the squashfs is already gzip'd), burning
+    // minutes on a 390 MB double-compression with zero size benefit.
+    aaptOptions {
+        noCompress += listOf("squashfs", "img")
+    }
+
     defaultConfig {
         applicationId = "com.excp.podroid"
         minSdk = 26
