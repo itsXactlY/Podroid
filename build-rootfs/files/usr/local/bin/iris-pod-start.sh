@@ -94,6 +94,23 @@ esac
 # makes boot self-healing.
 podman rm -f "${IRIS_CONTAINER_NAME}" 2>/dev/null || true
 
+# ── Per-install gateway identity ──────────────────────────────────────────
+# config.yaml ships dlm_identity="gateway-1" as a DEFAULT, so every pod that
+# keeps it COLLIDES: two phones both "gateway-1" can't pair (the addPeer handler
+# rejects peer_gid == own gateway_id with "cannot pair with self") and the DHT
+# transport can't route between two identical ids. Generate a UNIQUE id once,
+# persist it on the ext4 overlay next to the gateway keypair, and pass it as
+# IRIS_DLM_IDENTITY — the env key config.py actually honours (IRIS_IDENTITY_ID
+# in runtime.env was aspirational and never wired to anything). Stable across
+# reboots so a paired peer keeps recognising us.
+GATEWAY_ID_FILE="${IRIS_DATA_DIR}/gateway_id"
+if [ ! -s "${GATEWAY_ID_FILE}" ]; then
+    _gid="gw-$(tr -d - < /proc/sys/kernel/random/uuid | cut -c1-12)"
+    printf '%s\n' "${_gid}" > "${GATEWAY_ID_FILE}"
+    chmod 600 "${GATEWAY_ID_FILE}" 2>/dev/null || true
+fi
+PODMAN_FLAGS="${PODMAN_FLAGS} -e IRIS_DLM_IDENTITY=$(cat "${GATEWAY_ID_FILE}")"
+
 # Build the final command and exec into podman run.
 # We use --network=host so the WS port 9092 is reachable from the
 # guest's eth0 directly; podroid-forward on the host then forwards
