@@ -238,4 +238,30 @@
     <string name="avf_action_use_one_core">使用 1 个核心</string>
     <string name="avf_action_switch_qemu">切换至 QEMU</string>
     <string name="avf_action_retry">重试</string>
+
+    <!-- AVF Auto-Pair (one-time hardware accel enable) -->
+    <string name="avf_speedup_title">启用硬件加速虚拟机？</string>
+    <string name="avf_speedup_body">您的设备支持 AVF（pKVM）——一个真正的硬件虚拟化虚拟机，启动约需 10 秒，而软件模拟需要 1 分钟以上。启用只需一次性设置：通过设备内无线调试授予 podroid 两项特殊权限。无需 root，无需电脑。</string>
+    <string name="avf_speedup_benefit">约 10 秒启动 · 硬件 KVM · 更省电</string>
+    <string name="avf_accessibility_description">Podroid 仅在首次设置期间使用此服务，在 Android 设置应用中启用"开发者选项"和"无线调试"。一次性 AVF 权限授予完成后，它会自动关闭。它从不读取设置以外的任何内容。</string>
+    <string name="avf_step_enable_service">第 1 步：启用"Podroid 设置助手"无障碍服务（一次性）。</string>
+    <string name="avf_open_accessibility">打开无障碍设置</string>
+    <string name="avf_service_enabled">无障碍服务已启用 ✓</string>
+    <string name="avf_service_not_enabled">无障碍服务尚未启用</string>
+    <string name="avf_step_run">第 2 步：开始自动设置</string>
+    <string name="avf_start_setup">开始自动设置</string>
+    <string name="avf_progress_enabling">正在启用开发者选项和无线调试…</string>
+    <string name="avf_progress_opening_pair">正在打开配对对话框…</string>
+    <string name="avf_progress_awaiting_adb">已读取配对码——正在授予权限…</string>
+    <string name="avf_progress_granting">正在运行 adb 授权…</string>
+    <string name="avf_progress_reverting">正在关闭无线调试…</string>
+    <string name="avf_success_title">AVF 已启用！</string>
+    <string name="avf_success_body">硬件加速虚拟机现已激活。虚拟机将在快速后端重新启动。这是一次性设置。</string>
+    <string name="avf_failure_title">无法启用 AVF</string>
+    <string name="avf_failure_body">自动设置未完成。Podroid 将继续使用软件模拟（启动较慢）。您可以重试，或使用下方命令手动授予权限。</string>
+    <string name="avf_already_done">此设备已启用 AVF ✓</string>
+    <string name="avf_skip">使用软件模拟（较慢）</string>
+    <string name="avf_manual_grant_title">手动授权（可选）</string>
+    <string name="avf_grant_commands2">adb shell pm grant com.excp.podroid \\\n  android.permission.MANAGE_VIRTUAL_MACHINE\nadb shell pm grant com.excp.podroid \\\n  android.permission.USE_CUSTOM_VIRTUAL_MACHINE</string>
+    <string name="avf_hint_enable_auto">自动启用</string>
 </resources>

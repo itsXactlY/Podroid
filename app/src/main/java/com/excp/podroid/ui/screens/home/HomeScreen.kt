@@ -66,6 +66,7 @@ fun HomeScreen(
     windowSizeClass: WindowSizeClass,
     onNavigateToTerminal: () -> Unit,
     onNavigateToSettings: () -> Unit,
+    onNavigateToAvfSetup: () -> Unit,
     viewModel: HomeViewModel = hiltViewModel(),
 ) {
     val context = LocalContext.current
@@ -221,7 +222,10 @@ fun HomeScreen(
                             .verticalScroll(rememberScrollState()),
                     ) {
                         if (showAvfHint) {
-                            AvfHintBanner(onDismiss = { viewModel.dismissAvfHint() })
+                            AvfHintBanner(
+                                onDismiss = { viewModel.dismissAvfHint() },
+                                onEnableAuto = onNavigateToAvfSetup,
+                            )
                         }
                         HomeStatusBlock(
                             isStarting, isRunning, vmState, bootStage, meta, uptimeLabel,
@@ -260,7 +264,10 @@ fun HomeScreen(
                 ) {
                     Spacer(Modifier.height(PodroidTokens.Spacing.XL))
                     if (showAvfHint) {
-                        AvfHintBanner(onDismiss = { viewModel.dismissAvfHint() })
+                        AvfHintBanner(
+                            onDismiss = { viewModel.dismissAvfHint() },
+                            onEnableAuto = onNavigateToAvfSetup,
+                        )
                     }
                     HomeStatusBlock(
                         isStarting = isStarting,
@@ -294,7 +301,10 @@ fun HomeScreen(
 }
 
 @Composable
-private fun AvfHintBanner(onDismiss: () -> Unit) {
+private fun AvfHintBanner(
+    onDismiss: () -> Unit,
+    onEnableAuto: () -> Unit,
+) {
     Card(
         modifier = Modifier
             .fillMaxWidth()
@@ -327,6 +337,10 @@ private fun AvfHintBanner(onDismiss: () -> Unit) {
             ) {
                 TextButton(onClick = onDismiss) {
                     Text(stringResource(R.string.dismiss))
+                }
+                Spacer(Modifier.width(PodroidTokens.Spacing.SM))
+                Button(onClick = onEnableAuto) {
+                    Text(stringResource(R.string.avf_hint_enable_auto))
                 }
             }
         }

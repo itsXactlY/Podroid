@@ -237,4 +237,31 @@
     <string name="avf_action_use_one_core">Use 1 core</string>
     <string name="avf_action_switch_qemu">Switch to QEMU</string>
     <string name="avf_action_retry">Retry</string>
+
+    <!-- AVF Auto-Pair (one-time hardware accel enable) -->
+    <string name="avf_hint_enable_auto">Enable automatically</string>
+
+    <string name="avf_speedup_title">Enable hardware-accelerated VM?</string>
+    <string name="avf_speedup_body">Your device supports AVF (pKVM) — a real hardware-virtualized VM that boots in ~10s instead of 1min+ on software emulation. Enabling it is a ONE-TIME setup: grant podroid two special permissions via on-device wireless debugging. No root, no PC.</string>
+    <string name="avf_speedup_benefit">~10s boot · hardware KVM · lower battery use</string>
+    <string name="avf_accessibility_description">Podroid uses this service only during first-run setup to enable Developer Options and Wireless Debugging in the Android Settings app. It turns itself off automatically once the one-time AVF permission grant is complete. It never reads anything outside Settings.</string>
+    <string name="avf_step_enable_service">Step 1: Enable the \"Podroid Setup Assistant\" accessibility service (once).</string>
+    <string name="avf_open_accessibility">Open Accessibility Settings</string>
+    <string name="avf_service_enabled">Accessibility service enabled ✓</string>
+    <string name="avf_service_not_enabled">Accessibility service not yet enabled</string>
+    <string name="avf_step_run">Step 2: Start the automatic setup</string>
+    <string name="avf_start_setup">Start automatic setup</string>
+    <string name="avf_progress_enabling">Enabling Developer Options &amp; Wireless Debugging…</string>
+    <string name="avf_progress_opening_pair">Opening pairing dialog…</string>
+    <string name="avf_progress_awaiting_adb">Read pairing code — granting permissions…</string>
+    <string name="avf_progress_granting">Running adb grant…</string>
+    <string name="avf_progress_reverting">Disabling Wireless Debugging…</string>
+    <string name="avf_success_title">AVF enabled!</string>
+    <string name="avf_success_body">Hardware-accelerated VM is now active. The VM will restart on the fast backend. This was a one-time setup.</string>
+    <string name="avf_failure_title">Could not enable AVF</string>
+    <string name="avf_failure_body">The automatic setup didn\'t complete. Podroid will keep using software emulation (slower boot). You can retry, or grant the permissions manually with the commands below.</string>
+    <string name="avf_already_done">AVF already enabled on this device ✓</string>
+    <string name="avf_skip">Use software emulation (slower)</string>
+    <string name="avf_manual_grant_title">Manual grant (optional)</string>
+    <string name="avf_grant_commands2">adb shell pm grant com.excp.podroid \\\n  android.permission.MANAGE_VIRTUAL_MACHINE\nadb shell pm grant com.excp.podroid \\\n  android.permission.USE_CUSTOM_VIRTUAL_MACHINE</string>
 </resources>

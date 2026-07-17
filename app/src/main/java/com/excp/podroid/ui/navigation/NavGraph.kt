@@ -14,6 +14,7 @@ import androidx.navigation.compose.rememberNavController
 import com.excp.podroid.ui.screens.home.HomeScreen
 import com.excp.podroid.ui.screens.settings.SettingsScreen
 import com.excp.podroid.ui.screens.setup.SetupScreen
+import com.excp.podroid.ui.screens.setup.AvfSetupScreen
 import com.excp.podroid.ui.screens.terminal.TerminalScreen
 import com.excp.podroid.ui.screens.terminal.TerminalViewModel
 import com.excp.podroid.ui.screens.x11.X11Screen
@@ -24,6 +25,7 @@ object Routes {
     const val TERMINAL      = "terminal"
     const val TERMINAL_X11  = "terminal/x11"
     const val SETTINGS      = "settings"
+    const val AVF_SETUP     = "avf_setup"
 }
 
 @Composable
@@ -69,6 +71,9 @@ fun PodroidNavGraph(
                 },
                 onNavigateToSettings = {
                     navController.navigate(Routes.SETTINGS) { launchSingleTop = true }
+                },
+                onNavigateToAvfSetup = {
+                    navController.navigate(Routes.AVF_SETUP) { launchSingleTop = true }
                 },
             )
         }
@@ -125,6 +130,17 @@ fun PodroidNavGraph(
                     }
                 },
                 onLanguageChanged = onLanguageChanged,
+            )
+        }
+
+        composable(Routes.AVF_SETUP) {
+            AvfSetupScreen(
+                windowSizeClass = windowSizeClass,
+                onDone = {
+                    navController.navigate(Routes.HOME) {
+                        popUpTo(Routes.AVF_SETUP) { inclusive = true }
+                    }
+                },
             )
         }
     }
