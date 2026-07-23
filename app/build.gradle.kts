@@ -34,8 +34,8 @@ android {
         applicationId = "com.excp.podroid"
         minSdk = 26
         targetSdk = 36
-        versionCode = 29
-        versionName = "1.2.6"
+        versionCode = 30
+        versionName = "1.2.7"
         buildConfigField("String", "QEMU_VERSION", "\"$podroidQemuVersion\"")
         // GitHub repo (owner/name) the in-app self-updater pulls releases from.
         // The combined Iris+Podroid APK is published here as a release asset.

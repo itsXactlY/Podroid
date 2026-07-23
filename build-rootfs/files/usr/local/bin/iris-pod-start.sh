@@ -103,9 +103,22 @@ podman rm -f "${IRIS_CONTAINER_NAME}" 2>/dev/null || true
 # IRIS_DLM_IDENTITY — the env key config.py actually honours (IRIS_IDENTITY_ID
 # in runtime.env was aspirational and never wired to anything). Stable across
 # reboots so a paired peer keeps recognising us.
+#
+# UPGRADE SAFETY: an already-deployed pod may carry its identity in
+# runtime.env (IRIS_DLM_IDENTITY, set by hand or by an older provisioning
+# step) with NO gateway_id file yet. Minting a fresh id there would change
+# the gateway's identity on update — and every peer that pinned the OLD id
+# (federation_peers.json) would then reject our envelopes as coming from an
+# untrusted gateway, silently breaking established pairings. So: adopt an
+# existing IRIS_DLM_IDENTITY as the seed, and only mint a new one when there
+# is genuinely no prior identity (a real fresh install).
 GATEWAY_ID_FILE="${IRIS_DATA_DIR}/gateway_id"
 if [ ! -s "${GATEWAY_ID_FILE}" ]; then
-    _gid="gw-$(tr -d - < /proc/sys/kernel/random/uuid | cut -c1-12)"
+    if [ -n "${IRIS_DLM_IDENTITY:-}" ] && [ "${IRIS_DLM_IDENTITY}" != "gateway-1" ]; then
+        _gid="${IRIS_DLM_IDENTITY}"          # adopt the established identity
+    else
+        _gid="gw-$(tr -d - < /proc/sys/kernel/random/uuid | cut -c1-12)"
+    fi
     printf '%s\n' "${_gid}" > "${GATEWAY_ID_FILE}"
     chmod 600 "${GATEWAY_ID_FILE}" 2>/dev/null || true
 fi
