@@ -119,17 +119,13 @@ class HomeViewModel @Inject constructor(
      * simple map on the dismissed flow rather than a heavy combine.
      */
     private val _avfProbe = com.excp.podroid.engine.avf.AvfDiagnostics.probe(context)
-    val showAvfHint: StateFlow<Boolean> = kotlinx.coroutines.flow.combine(
-        settingsRepository.avfHintDismissed,
-        settingsRepository.avfAutopairDone,
-        settingsRepository.avfAutopairDeclined,
-    ) { dismissed, autopairDone, autopairDeclined ->
-        _avfProbe.featureSupported &&
-            !_avfProbe.managePermissionGranted &&
-            !dismissed &&
-            !autopairDone &&
-            !autopairDeclined
-    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), false)
+    val showAvfHint: StateFlow<Boolean> = settingsRepository.avfHintDismissed
+        .map { dismissed ->
+            _avfProbe.featureSupported &&
+                !_avfProbe.managePermissionGranted &&
+                !dismissed
+        }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), false)
 
     /** True when AVF was the active backend and the VM ended in Error
      *  (boot failure / crash). Drives the actionable failure surface. */

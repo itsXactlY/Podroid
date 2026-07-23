@@ -71,12 +71,6 @@ class SettingsRepository @Inject constructor(
         // changes the CPU-count setting so the new value is re-probed.
         val KEY_AVF_CPU_CAP             = intPreferencesKey("avf_cpu_cap")
         val KEY_USB_PASSTHROUGH_ENABLED = booleanPreferencesKey("usb_passthrough_enabled")
-        // One-time AVF auto-pair: once we've either enabled AVF or the user
-        // declined/skipped, we don't re-prompt on every launch. Set by
-        // AvfAutoPair after a successful grant OR when the user explicitly
-        // skips the speed-up offer.
-        val KEY_AVF_AUTOPAIR_DONE    = booleanPreferencesKey("avf_autopair_done")
-        val KEY_AVF_AUTOPAIR_DECLINED = booleanPreferencesKey("avf_autopair_declined")
 
         val KEY_X11_RES_MODE        = stringPreferencesKey("x11_resolution_mode")
         val KEY_X11_RES_PRESET      = stringPreferencesKey("x11_resolution_preset")
@@ -155,8 +149,6 @@ class SettingsRepository @Inject constructor(
     val avfHintDismissed     = pref(KEY_AVF_HINT_DISMISSED, false)
     val avfCpuCap            = pref(KEY_AVF_CPU_CAP, 0)
     val usbPassthroughEnabled = pref(KEY_USB_PASSTHROUGH_ENABLED, false)
-    val avfAutopairDone = pref(KEY_AVF_AUTOPAIR_DONE, false)
-    val avfAutopairDeclined = pref(KEY_AVF_AUTOPAIR_DECLINED, false)
     val avfVerboseLogging: Flow<Boolean> = context.dataStore.data
         .catch { e -> if (e is IOException) emit(androidx.datastore.preferences.core.emptyPreferences()) else throw e }
         .map { prefs -> prefs[KEY_AVF_VERBOSE_LOGGING] ?: false }
@@ -199,8 +191,6 @@ class SettingsRepository @Inject constructor(
     suspend fun setAvfVerboseLogging(value: Boolean)     = set(KEY_AVF_VERBOSE_LOGGING, value)
     suspend fun setAvfCpuCap(value: Int)                 = set(KEY_AVF_CPU_CAP, value)
     suspend fun setUsbPassthroughEnabled(value: Boolean) = set(KEY_USB_PASSTHROUGH_ENABLED, value)
-    suspend fun setAvfAutopairDone(value: Boolean) = set(KEY_AVF_AUTOPAIR_DONE, value)
-    suspend fun setAvfAutopairDeclined(value: Boolean) = set(KEY_AVF_AUTOPAIR_DECLINED, value)
 
     /**
      * Persists all first-run setup choices in a single transaction so a process

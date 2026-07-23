@@ -118,26 +118,6 @@
                 android:value="Podman emulation via QEMU" />
         </service>
 
-        <!--
-            AVF auto-pair AccessibilityService. Drives the OEM Settings app
-            through the one-time toggles (Developer Options + Wireless
-            Debugging) needed to reach a shell uid for the AVF permission
-            grant. The user enables it ONCE from podroid's first-run screen;
-            it disables itself after the grant (or on failure). It may only
-            interact with the Settings package (see res/xml/avf_accessibility_config.xml).
-        -->
-        <service
-            android:name=".avfpair.PodroidSetupAssistant"
-            android:exported="false"
-            android:permission="android.permission.BIND_ACCESSIBILITY_SERVICE">
-            <intent-filter>
-                <action android:name="android.accessibilityservice.AccessibilityService" />
-            </intent-filter>
-            <meta-data
-                android:name="android.accessibilityservice"
-                android:resource="@xml/avf_accessibility_config" />
-        </service>
-
     </application>
 
 </manifest>
