@@ -80,7 +80,7 @@ class AdbRunner(private val context: Context) {
         log("pair -> success=$paired exit=${pairR.exitCode} out=${pairR.output.take(300)}")
         if (!paired) {
             return GrantResult(false, false, false, sb.toString()).also {
-                revert(log)
+                revert(::log)
             }
         }
 
@@ -94,7 +94,7 @@ class AdbRunner(private val context: Context) {
         log("connect -> success=$connected exit=${connR.exitCode} out=${connR.output.take(300)}")
         if (!connected) {
             return GrantResult(true, false, false, sb.toString()).also {
-                revert(log)
+                revert(::log)
             }
         }
 
@@ -113,7 +113,7 @@ class AdbRunner(private val context: Context) {
         log("verify perms: manage=${probe.managePermissionGranted} custom=${probe.customPermissionGranted} -> verified=$verified")
 
         // 5. On ANY failure, revert so we leave the device as we found it.
-        if (!verified) revert(log)
+        if (!verified) revert(::log)
 
         return GrantResult(paired, connected, verified, sb.toString())
     }

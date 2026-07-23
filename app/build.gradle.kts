@@ -4,6 +4,8 @@
  * A headless AArch64 QEMU micro-VM running Alpine Linux with Podman,
  * accessed via built-in serial terminal.
  */
+import java.util.Properties
+
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.compose)
@@ -49,12 +51,26 @@ android {
 
     signingConfigs {
         create("release") {
-            val storePath = (project.findProperty("PODROID_RELEASE_STORE_FILE") as? String)
-            if (storePath != null && file(storePath).exists()) {
-                storeFile     = file(storePath)
-                storePassword = project.findProperty("PODROID_RELEASE_STORE_PASSWORD") as? String
-                keyAlias      = project.findProperty("PODROID_RELEASE_KEY_ALIAS")      as? String
-                keyPassword   = project.findProperty("PODROID_RELEASE_KEY_PASSWORD")   as? String
+            // Preferred: a keystore.properties file (storeFile/storePassword/
+            // keyAlias/keyPassword; storeFile relative to the props file) so
+            // secrets never ride the command line. Fallback: the individual
+            // PODROID_RELEASE_* Gradle properties.
+            val propsPath = (project.findProperty("PODROID_KEYSTORE_PROPERTIES") as? String)
+            val propsFile = propsPath?.let { file(it) }
+            if (propsFile != null && propsFile.exists()) {
+                val p = Properties().apply { propsFile.inputStream().use { s -> load(s) } }
+                storeFile     = propsFile.parentFile.resolve(p.getProperty("storeFile"))
+                storePassword = p.getProperty("storePassword")
+                keyAlias      = p.getProperty("keyAlias")
+                keyPassword   = p.getProperty("keyPassword")
+            } else {
+                val storePath = (project.findProperty("PODROID_RELEASE_STORE_FILE") as? String)
+                if (storePath != null && file(storePath).exists()) {
+                    storeFile     = file(storePath)
+                    storePassword = project.findProperty("PODROID_RELEASE_STORE_PASSWORD") as? String
+                    keyAlias      = project.findProperty("PODROID_RELEASE_KEY_ALIAS")      as? String
+                    keyPassword   = project.findProperty("PODROID_RELEASE_KEY_PASSWORD")   as? String
+                }
             }
         }
     }

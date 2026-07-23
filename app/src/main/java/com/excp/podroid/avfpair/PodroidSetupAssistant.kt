@@ -50,8 +50,8 @@ class PodroidSetupAssistant : AccessibilityService() {
 
         // Publish current phase so the UI/orchestrator can show progress.
         fun publishPhase(phase: String, detail: String = "") {
-            AvfPairBus.phase.value = phase
-            if (detail.isNotEmpty()) AvfPairBus.details.value = detail
+            AvfPairBus.setPhase(phase)
+            if (detail.isNotEmpty()) AvfPairBus.setDetails(detail)
             Log.i(TAG, "phase=$phase $detail")
         }
     }
@@ -134,7 +134,7 @@ class PodroidSetupAssistant : AccessibilityService() {
             val extracted = readPairingInfo(visible)
             if (extracted != null) {
                 Log.i(TAG, "PAIR INFO code=${extracted.code} pairPort=${extracted.pairPort} connectPort=${extracted.connectPort}")
-                AvfPairBus.pairingInfo.value = extracted
+                AvfPairBus.setPairingInfo(extracted)
                 publishPhase("awaiting_adb", "code read; orchestrator running adb")
                 // Halt: orchestrator will switch goal to REVERT_WD on success.
                 return
@@ -207,7 +207,7 @@ class PodroidSetupAssistant : AccessibilityService() {
                 // Done — WD is off. Stop ourselves.
                 Log.i(TAG, "REVERT_WD complete; disabling service")
                 publishPhase("reverted")
-                AvfPairBus.reverted.value = true
+                AvfPairBus.setRejected()
                 disableSelf()
                 return
             }
