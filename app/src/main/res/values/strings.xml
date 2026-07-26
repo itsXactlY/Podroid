@@ -26,6 +26,8 @@
 
     <!-- Actions -->
     <string name="settings">Settings</string>
+    <string name="check_for_updates">Check for updates</string>
+    <string name="update_up_to_date">Podroid is up to date</string>
     <string name="open_terminal">Open Terminal</string>
     <string name="restart">Restart</string>
     <string name="stop">Stop</string>

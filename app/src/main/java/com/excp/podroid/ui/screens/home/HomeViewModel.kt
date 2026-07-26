@@ -197,20 +197,55 @@ class HomeViewModel @Inject constructor(
         }
     }
 
-    private fun checkForUpdate() {
+    private val _checkingForUpdate = MutableStateFlow(false)
+    val checkingForUpdate: StateFlow<Boolean> = _checkingForUpdate.asStateFlow()
+
+    /** One-shot signal for the manual check: true if the just-completed check
+     *  found nothing new, so the UI can show a brief "up to date" confirmation
+     *  instead of leaving the user wondering whether the tap did anything.
+     *  Cleared by the UI via [clearUpToDateSignal] after it's shown once. */
+    private val _upToDateSignal = MutableStateFlow(false)
+    val upToDateSignal: StateFlow<Boolean> = _upToDateSignal.asStateFlow()
+
+    private fun checkForUpdate() = doCheckForUpdate(force = false)
+
+    /** User-initiated check from Settings — bypasses the 24h cache gate.
+     *  Automatic checks only run once per HomeViewModel lifetime (init{}) plus
+     *  on-resume; this is the only way to force a check without restarting the
+     *  app or waiting out the cache. */
+    fun checkForUpdateNow() = doCheckForUpdate(force = true)
+
+    private fun doCheckForUpdate(force: Boolean) {
         viewModelScope.launch {
+            if (force) _checkingForUpdate.value = true
             try {
-                val info = updateRepository.checkForUpdate(BuildConfig.VERSION_NAME) ?: return@launch
-                if (!updateRepository.isDismissed(info.latestVersion)) {
+                val info = updateRepository.checkForUpdate(BuildConfig.VERSION_NAME, force = force)
+                if (info == null) {
+                    if (force) _upToDateSignal.value = true
+                    return@launch
+                }
+                if (force || !updateRepository.isDismissed(info.latestVersion)) {
                     _updateInfo.value = info
                 }
             } catch (c: kotlinx.coroutines.CancellationException) {
                 throw c
             } catch (e: Exception) {
                 android.util.Log.w("HomeViewModel", "update check failed", e)
+            } finally {
+                if (force) _checkingForUpdate.value = false
             }
         }
     }
+
+    /** Called by the UI once it has shown the "up to date" confirmation. */
+    fun clearUpToDateSignal() {
+        _upToDateSignal.value = false
+    }
+
+    /** Re-check on every return to Home (e.g. backgrounded overnight, or the
+     *  manifest changed since last cold start) — still gated by the normal
+     *  24h cache unless the user taps "Check for updates" in Settings. */
+    fun onResume() = checkForUpdate()
 
     fun dismissUpdate() {
         val version = _updateInfo.value?.latestVersion ?: return

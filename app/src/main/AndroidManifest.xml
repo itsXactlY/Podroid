@@ -108,6 +108,12 @@
                 android:resource="@xml/file_paths" />
         </provider>
 
+        <!-- Callback target for UpdateRepository's PackageInstaller session commits.
+             Not exported: only our own PendingIntent ever targets it. -->
+        <receiver
+            android:name=".data.repository.InstallResultReceiver"
+            android:exported="false" />
+
         <!-- Foreground service that hosts the QEMU process -->
         <service
             android:name=".service.PodroidService"

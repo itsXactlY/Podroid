@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Only strings touched by this fix are translated here — everything
+         else falls back to values/strings.xml (default Android behavior for
+         a partial locale overlay), same pattern as values-zh. -->
+    <string name="check_for_updates">Nach Updates suchen</string>
+    <string name="update_up_to_date">Podroid ist auf dem neuesten Stand</string>
+</resources>

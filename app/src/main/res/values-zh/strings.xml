@@ -26,6 +26,8 @@
 
     <!-- Actions -->
     <string name="settings">设置</string>
+    <string name="check_for_updates">检查更新</string>
+    <string name="update_up_to_date">Podroid 已是最新版本</string>
     <string name="open_terminal">打开终端</string>
     <string name="restart">重启</string>
     <string name="stop">停止</string>

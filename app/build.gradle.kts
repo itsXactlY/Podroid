@@ -34,12 +34,16 @@ android {
         applicationId = "com.excp.podroid"
         minSdk = 26
         targetSdk = 36
-        versionCode = 30
-        versionName = "1.2.7"
+        versionCode = 38
+        versionName = "1.3.5"
         buildConfigField("String", "QEMU_VERSION", "\"$podroidQemuVersion\"")
-        // GitHub repo (owner/name) the in-app self-updater pulls releases from.
-        // The combined Iris+Podroid APK is published here as a release asset.
-        buildConfigField("String", "UPDATE_REPO", "\"itsXactlY/Iris-Messenger\"")
+        // Self-hosted update manifest (see jackbox/build-box.sh + publish-thebox.sh
+        // in mazemaker-mobile). NOT GitHub: itsXactlY/Iris-Messenger is a PRIVATE
+        // repo, so an unauthenticated api.github.com/repos/.../releases/latest call
+        // always 404s (GitHub hides private repos from anonymous requests) — the
+        // in-app updater silently never worked. This manifest is served straight
+        // off mazemaker-prod, no auth needed, no GitHub rate limits to worry about.
+        buildConfigField("String", "UPDATE_MANIFEST_URL", "\"https://iris.mazemaker.online/thebox/manifest.json\"")
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 

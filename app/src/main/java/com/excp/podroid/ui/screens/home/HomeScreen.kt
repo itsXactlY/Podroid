@@ -89,10 +89,23 @@ fun HomeScreen(
     val lifecycleOwner = LocalLifecycleOwner.current
     DisposableEffect(lifecycleOwner) {
         val observer = LifecycleEventObserver { _, event ->
-            if (event == Lifecycle.Event.ON_RESUME) phoneIp = viewModel.phoneIp()
+            if (event == Lifecycle.Event.ON_RESUME) {
+                phoneIp = viewModel.phoneIp()
+                viewModel.onResume()
+            }
         }
         lifecycleOwner.lifecycle.addObserver(observer)
         onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+    }
+
+    val checkingForUpdate by viewModel.checkingForUpdate.collectAsStateWithLifecycle()
+    val upToDateSignal by viewModel.upToDateSignal.collectAsStateWithLifecycle()
+    val upToDateMessage = stringResource(R.string.update_up_to_date)
+    androidx.compose.runtime.LaunchedEffect(upToDateSignal) {
+        if (upToDateSignal) {
+            android.widget.Toast.makeText(context, upToDateMessage, android.widget.Toast.LENGTH_SHORT).show()
+            viewModel.clearUpToDateSignal()
+        }
     }
 
     updateInfo?.let { info ->
@@ -190,6 +203,22 @@ fun HomeScreen(
             PodroidTopBar(
                 title = stringResource(R.string.app_name),
                 actions = {
+                    IconButton(
+                        onClick = { viewModel.checkForUpdateNow() },
+                        enabled = !checkingForUpdate,
+                    ) {
+                        if (checkingForUpdate) {
+                            androidx.compose.material3.CircularProgressIndicator(
+                                modifier = Modifier.height(20.dp),
+                                strokeWidth = 2.dp,
+                            )
+                        } else {
+                            Icon(
+                                Icons.Default.SystemUpdate,
+                                contentDescription = stringResource(R.string.check_for_updates),
+                            )
+                        }
+                    }
                     IconButton(onClick = onNavigateToSettings) {
                         Icon(Icons.Default.Settings, contentDescription = stringResource(R.string.settings))
                     }
