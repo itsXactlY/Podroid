@@ -66,19 +66,54 @@ start_pre() {
     # host). The tarball is the obfuscated Nuitka .bin wrapped in a
     # minimal scratch container with glibc; podroid-podman runs it
     # directly. ARM64 is a TODO — see build-podman-image.sh.
-    if ! podman image exists "${IRIS_IMAGE}" 2>/dev/null; then
-        if [ -f /usr/local/share/iris/iris-messenger-arm64.tar ]; then
-            einfo "Loading iris-messenger arm64 image (native, no x86 emulation)"
-            podman load -i /usr/local/share/iris/iris-messenger-arm64.tar
-        elif [ -f /usr/local/share/iris/iris-messenger-amd64.tar ]; then
-            einfo "Loading iris-messenger amd64 image (x86_64 user-emulated)"
-            podman load -i /usr/local/share/iris/iris-messenger-amd64.tar
-        else
-            eerror "iris-messenger image not present and no vendor tarball found"
-            eerror "Expected: ${IRIS_IMAGE}"
-            eerror "Or:      /usr/local/share/iris/iris-messenger-amd64.tar"
-            return 1
+    # Pick the vendored tarball for this arch (arm64 native, amd64 emulated).
+    _iris_tar=""
+    if [ -f /usr/local/share/iris/iris-messenger-arm64.tar ]; then
+        _iris_tar=/usr/local/share/iris/iris-messenger-arm64.tar
+    elif [ -f /usr/local/share/iris/iris-messenger-amd64.tar ]; then
+        _iris_tar=/usr/local/share/iris/iris-messenger-amd64.tar
+    fi
+
+    # Load the tarball when the image is MISSING **or when the tarball changed**.
+    #
+    # The old test was `podman image exists` alone, which is wrong on every
+    # upgrade: the squashfs (and therefore the tarball) is replaced wholesale by
+    # a new Podroid APK, but the container store lives on the PERSISTENT ext4
+    # overlay and still holds the previous localhost/iris-messenger:arm64. The
+    # image "exists", so nothing was loaded and the phone silently kept running
+    # the OLD pod — an updated Podroid shipped a new gateway that never ran.
+    # (Caught live 2026-07-29: the new /api/federation/inbox endpoint would have
+    # stayed 404 on both phones after a successful OTA.)
+    #
+    # The stamp is the tarball's sha256, kept next to the pod's persistent state
+    # so it survives reboots but not a data wipe. Hashing ~194 MB costs about a
+    # second on ARM64 with crypto extensions — paid once per boot, and far
+    # cheaper than shipping an image that never runs.
+    if [ -n "${_iris_tar}" ]; then
+        _iris_stamp="${IRIS_DATA_DIR}/.iris-image.sha256"
+        _iris_want="$(sha256sum "${_iris_tar}" 2>/dev/null | cut -d' ' -f1)"
+        _iris_have="$(cat "${_iris_stamp}" 2>/dev/null)"
+        if ! podman image exists "${IRIS_IMAGE}" 2>/dev/null; then
+            einfo "Loading iris-messenger image from ${_iris_tar} (not present yet)"
+            podman load -i "${_iris_tar}" && printf '%s\n' "${_iris_want}" > "${_iris_stamp}"
+        elif [ -n "${_iris_want}" ] && [ "${_iris_want}" != "${_iris_have}" ]; then
+            einfo "Vendored iris-messenger image changed — reloading from ${_iris_tar}"
+            # Drop the running container first: `podman run` binds the image at
+            # create time, so a live container would keep the old one alive.
+            podman rm -f "${IRIS_CONTAINER_NAME}" 2>/dev/null || true
+            if podman load -i "${_iris_tar}"; then
+                printf '%s\n' "${_iris_want}" > "${_iris_stamp}"
+            else
+                # Keep the old image rather than leave the phone with no pod;
+                # the stamp stays stale so the next boot retries.
+                eerror "podman load failed — continuing with the previously loaded image"
+            fi
         fi
+    elif ! podman image exists "${IRIS_IMAGE}" 2>/dev/null; then
+        eerror "iris-messenger image not present and no vendor tarball found"
+        eerror "Expected: ${IRIS_IMAGE}"
+        eerror "Or:      /usr/local/share/iris/iris-messenger-{arm64,amd64}.tar"
+        return 1
     fi
 }
 
