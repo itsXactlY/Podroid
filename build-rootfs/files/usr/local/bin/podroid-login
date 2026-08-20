@@ -30,7 +30,22 @@ stty rows "$_r" cols "$_c" 2>/dev/null
 # before /bin/login, which is what makes it unskippable from the terminal.
 #
 # Undo for a re-provision:  rm /etc/podroid/password-set
-if [ ! -f /etc/podroid/password-set ]; then
+# RESCUE HATCH. Typing `rescue` at the login prompt re-runs this flow even
+# when the marker exists. It exists because the first version of this code
+# could lock the operator out: if the password that got hashed differed from
+# the one they typed (see the IFS/-r/CR bugs fixed below), the console
+# rejected them and SSH was gated off, leaving no way back in short of
+# wiping the VM's storage.
+#
+# This is only reachable from the local console, which already sits behind
+# the phone's lock screen and the Podroid app, and it grants nothing without
+# setting a NEW password that still has to pass the rules below. dropbear is
+# untouched by it.
+_forced=0
+[ ! -f /etc/podroid/password-set ] && _forced=1
+case "${1:-}" in rescue|RESCUE) _forced=1 ;; esac
+
+if [ "$_forced" = "1" ]; then
     printf '\n'
     printf '  ####################################################\n'
     printf '  #  Podroid first-run: set a password               #\n'
@@ -44,15 +59,25 @@ if [ ! -f /etc/podroid/password-set ]; then
     printf '\n'
 
     while :; do
+        # `IFS= read -r` is load-bearing, and getting it wrong is what locked
+        # the first tester out:
+        #   * without IFS= the shell strips leading/trailing whitespace,
+        #   * without -r a backslash is an escape and disappears,
+        #   * a serial console can deliver a trailing CR.
+        # Any of those hashes a DIFFERENT string than the operator typed, so
+        # chpasswd succeeds, the marker is written, and the next login is
+        # rejected forever. Strip only CR, never anything the user meant.
         printf '  New root password: '
         stty -echo 2>/dev/null
-        read _pw1
+        IFS= read -r _pw1
         stty echo 2>/dev/null
         printf '\n  Repeat: '
         stty -echo 2>/dev/null
-        read _pw2
+        IFS= read -r _pw2
         stty echo 2>/dev/null
         printf '\n'
+        _pw1=$(printf '%s' "$_pw1" | tr -d '\r')
+        _pw2=$(printf '%s' "$_pw2" | tr -d '\r')
 
         if [ "$_pw1" != "$_pw2" ]; then
             printf '  -> They do not match. Again.\n\n'
@@ -86,7 +111,8 @@ if [ ! -f /etc/podroid/password-set ]; then
             mkdir -p /etc/podroid
             : > /etc/podroid/password-set
             chmod 0644 /etc/podroid/password-set
-            printf '  Password set. Log in with it now.\n\n'
+            printf '  Password set (%s characters). Log in with it now.\n' "${#_pw1}"
+            printf '  If it is ever rejected, log in as: rescue\n\n'
             # SSH was withheld while the default was in place (see
             # /etc/init.d/podroid-sshd). Bring it up now rather than at the
             # next boot, so provisioning finishes in one session.
