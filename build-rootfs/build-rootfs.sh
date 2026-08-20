@@ -262,6 +262,18 @@ chmod 0644 "$ROOTFS/etc/podroid/forwards.conf"
 # Migration scripts dir (seeded with its README; per-version <v>.sh added over time).
 mkdir -p "$ROOTFS/etc/podroid/migrations"
 cp /work/files/etc/podroid/migrations/README "$ROOTFS/etc/podroid/migrations/README"
+# ...and the migrations themselves. This copy did not exist until the first
+# migration shipped (43.sh, the Deadalus -> Daedalus rename): the directory was
+# created and its README installed, but the <v>.sh files were left on the build
+# host, so podroid-migrate always found an empty dir and every release silently
+# skipped its own fixups. Glob is guarded because a release with no new
+# migration is the normal case and must not fail the build.
+for mig in /work/files/etc/podroid/migrations/*.sh; do
+    [ -e "$mig" ] || continue
+    cp "$mig" "$ROOTFS/etc/podroid/migrations/"
+    chmod 0755 "$ROOTFS/etc/podroid/migrations/$(basename "$mig")"
+    echo "installed migration $(basename "$mig")"
+done
 # System-version stamp: the migration anchor. Baked from the app versionCode at
 # build time; compared against /mnt/persist/.podroid/applied-version at boot.
 printf '%s\n' "${SYSTEM_VERSION:-0}" > "$ROOTFS/etc/podroid/system-version"
