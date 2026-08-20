@@ -34,8 +34,8 @@ android {
         applicationId = "com.excp.podroid"
         minSdk = 26
         targetSdk = 36
-        versionCode = 41
-        versionName = "1.3.8"
+        versionCode = 42
+        versionName = "1.3.9"
         buildConfigField("String", "QEMU_VERSION", "\"$podroidQemuVersion\"")
         // Self-hosted update manifest (see jackbox/build-box.sh + publish-thebox.sh
         // in mazemaker-mobile). NOT GitHub: itsXactlY/Iris-Messenger is a PRIVATE
