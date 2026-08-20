@@ -115,26 +115,6 @@
             android:exported="false" />
 
         <!-- Foreground service that hosts the QEMU process -->
-        <!--
-            Second launcher icon: "Deadalus". Same MainActivity, but the alias
-            name tells it to open the Terminal directly. Combined with the
-            biometric credential unlock, that collapses
-            podroid -> terminal -> login -> deadalus into one tap.
-
-            An activity-alias cannot carry intent extras, which is why the
-            component name is the signal. targetActivity must stay MainActivity.
-        -->
-        <activity-alias
-            android:name=".DeadalusTerminalAlias"
-            android:targetActivity=".MainActivity"
-            android:label="Deadalus"
-            android:exported="true">
-            <intent-filter>
-                <action android:name="android.intent.action.MAIN" />
-                <category android:name="android.intent.category.LAUNCHER" />
-            </intent-filter>
-        </activity-alias>
-
         <service
             android:name=".service.PodroidService"
             android:exported="false"

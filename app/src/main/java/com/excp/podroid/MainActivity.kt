@@ -2,7 +2,7 @@ package com.excp.podroid
 
 import android.content.Context
 import android.os.Bundle
-import androidx.fragment.app.FragmentActivity
+import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.layout.fillMaxSize
@@ -21,37 +21,7 @@ import com.excp.podroid.ui.theme.PodroidTheme
 import dagger.hilt.android.AndroidEntryPoint
 
 @AndroidEntryPoint
-// FragmentActivity, not ComponentActivity: androidx BiometricPrompt
-// requires one to host its prompt fragment. FragmentActivity extends
-// ComponentActivity, so setContent/enableEdgeToEdge are unaffected.
-class MainActivity : FragmentActivity() {
-
-    companion object {
-        /** Simple name of the launcher alias declared in AndroidManifest.xml. */
-        const val DEADALUS_ALIAS = "DeadalusTerminalAlias"
-    }
-
-    /**
-     * Route the launcher asked for, or null for a normal start.
-     *
-     * This is state, not a value read once in onCreate: when the app is already
-     * running, tapping the Deadalus icon delivers the intent to the existing
-     * task via onNewIntent and onCreate never runs again. Reading the intent
-     * only in onCreate made the icon work on a cold start and silently resume
-     * whatever screen was last open otherwise.
-     */
-    private val routeRequest = androidx.compose.runtime.mutableStateOf<String?>(null)
-
-    private fun routeFor(i: android.content.Intent?): String? =
-        if (i?.component?.className?.endsWith(DEADALUS_ALIAS) == true)
-            com.excp.podroid.ui.navigation.Routes.TERMINAL
-        else null
-
-    override fun onNewIntent(intent: android.content.Intent) {
-        super.onNewIntent(intent)
-        setIntent(intent)
-        routeFor(intent)?.let { routeRequest.value = it }
-    }
+class MainActivity : ComponentActivity() {
 
     override fun attachBaseContext(newBase: Context?) {
         val base = newBase ?: return super.attachBaseContext(null)
@@ -63,7 +33,6 @@ class MainActivity : FragmentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         enableEdgeToEdge()
         super.onCreate(savedInstanceState)
-        routeRequest.value = routeFor(intent)
         setContent {
             val windowSizeClass = calculateWindowSizeClass(this)
             val navVm: NavGraphViewModel = hiltViewModel()
@@ -110,14 +79,7 @@ class MainActivity : FragmentActivity() {
                     color = MaterialTheme.colorScheme.background,
                 ) {
                     androidx.compose.foundation.layout.Box(Modifier.fillMaxSize()) {
-                        // Launched from the "Deadalus" icon? An activity-alias
-                        // cannot carry intent extras, but it does show up as the
-                        // component that started us — so switch on that.
-                        PodroidNavGraph(
-                            windowSizeClass = windowSizeClass,
-                            startRouteOverride = routeFor(intent),
-                            routeRequest = routeRequest,
-                        )
+                        PodroidNavGraph(windowSizeClass = windowSizeClass)
                         if (headlessActive) {
                             com.excp.podroid.ui.components.HeadlessOverlay(onExit = { headlessVm.disable() })
                         }
