@@ -135,6 +135,11 @@ dependencies {
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.activity.compose)
 
+    // Deadalus one-tap unlock: BiometricPrompt gates the stored guest
+    // password, which never leaves the Keystore-backed store in plaintext.
+    implementation(libs.androidx.biometric)
+    implementation(libs.androidx.security.crypto)
+
     // Lifecycle & ViewModel
     implementation(libs.androidx.lifecycle.runtime.ktx)
     implementation(libs.androidx.lifecycle.viewmodel.compose)

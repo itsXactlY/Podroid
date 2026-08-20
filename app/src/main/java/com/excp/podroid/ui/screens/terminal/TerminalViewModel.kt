@@ -663,6 +663,19 @@ class TerminalViewModel @Inject constructor(
         override fun logStackTrace(tag: String?, e: Exception?) = LogProxy.stackTrace(tag, TAG, e)
     }
 
+    /** True once a session is attached, so callers can wait before typing. */
+    val hasSession: Boolean get() = session != null
+
+    /**
+     * Type a line into the live session, exactly as if the operator had typed
+     * it. Used by the Deadalus one-tap unlock to answer the console login
+     * prompt and start the agent. No-op while no session is attached.
+     */
+    fun typeLine(text: String) {
+        val bytes = (text + "\n").toByteArray(Charsets.UTF_8)
+        session?.write(bytes, 0, bytes.size)
+    }
+
     fun createSession() {
         if (attached) return
 

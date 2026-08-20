@@ -1,4 +1,6 @@
 [versions]
+biometric = "1.1.0"
+securityCrypto = "1.1.0-alpha06"
 agp = "9.1.0"
 kotlin = "2.2.21"
 ksp = "2.3.6"
@@ -34,6 +36,8 @@ junitVersion = "1.2.1"
 espressoCore = "3.6.1"
 
 [libraries]
+androidx-biometric = { group = "androidx.biometric", name = "biometric", version.ref = "biometric" }
+androidx-security-crypto = { group = "androidx.security", name = "security-crypto", version.ref = "securityCrypto" }
 # Core
 androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "coreKtx" }
 androidx-activity-compose = { group = "androidx.activity", name = "activity-compose", version.ref = "activityCompose" }

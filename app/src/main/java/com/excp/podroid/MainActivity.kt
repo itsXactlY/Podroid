@@ -2,7 +2,7 @@ package com.excp.podroid
 
 import android.content.Context
 import android.os.Bundle
-import androidx.activity.ComponentActivity
+import androidx.fragment.app.FragmentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.layout.fillMaxSize
@@ -21,7 +21,15 @@ import com.excp.podroid.ui.theme.PodroidTheme
 import dagger.hilt.android.AndroidEntryPoint
 
 @AndroidEntryPoint
-class MainActivity : ComponentActivity() {
+// FragmentActivity, not ComponentActivity: androidx BiometricPrompt
+// requires one to host its prompt fragment. FragmentActivity extends
+// ComponentActivity, so setContent/enableEdgeToEdge are unaffected.
+class MainActivity : FragmentActivity() {
+
+    companion object {
+        /** Simple name of the launcher alias declared in AndroidManifest.xml. */
+        const val DEADALUS_ALIAS = "DeadalusTerminalAlias"
+    }
 
     override fun attachBaseContext(newBase: Context?) {
         val base = newBase ?: return super.attachBaseContext(null)
@@ -79,7 +87,17 @@ class MainActivity : ComponentActivity() {
                     color = MaterialTheme.colorScheme.background,
                 ) {
                     androidx.compose.foundation.layout.Box(Modifier.fillMaxSize()) {
-                        PodroidNavGraph(windowSizeClass = windowSizeClass)
+                        // Launched from the "Deadalus" icon? An activity-alias
+                        // cannot carry intent extras, but it does show up as the
+                        // component that started us — so switch on that.
+                        val startRoute =
+                            if (intent?.component?.className?.endsWith(DEADALUS_ALIAS) == true)
+                                com.excp.podroid.ui.navigation.Routes.TERMINAL
+                            else null
+                        PodroidNavGraph(
+                            windowSizeClass = windowSizeClass,
+                            startRouteOverride = startRoute,
+                        )
                         if (headlessActive) {
                             com.excp.podroid.ui.components.HeadlessOverlay(onExit = { headlessVm.disable() })
                         }
