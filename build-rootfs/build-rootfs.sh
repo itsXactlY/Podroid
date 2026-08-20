@@ -11,7 +11,7 @@ mkdir -p "$ROOTFS/etc/apk"
 # The edge entry is TAGGED (@edge), not a plain repo line: apk only pulls from
 # it for packages asked for as pkg@edge. Everything else stays on v$ALPINE_BRANCH,
 # so this does not turn the guest into a rolling release. It exists for one
-# package — python3 3.14, which Deadalus requires and 3.23 main does not carry
+# package — python3 3.14, which Daedalus requires and 3.23 main does not carry
 # (it ships 3.12). Verified: python3@edge installs without moving musl off
 # 1.2.5-r23, so there is no libc mix.
 cat > "$ROOTFS/etc/apk/repositories" <<EOF
@@ -122,21 +122,21 @@ cp /work/files/etc/init.d/podroid-hostd     "$ROOTFS/etc/init.d/"
 cp /work/files/etc/init.d/podroid-migrate   "$ROOTFS/etc/init.d/"
 chmod +x "$ROOTFS/etc/init.d/podroid-"*
 
-# deadalus pod (B): OpenRC init that runs the native Python Deadalus gateway
-# inside the Podroid VM on guest :8088. Deadalus replaced Hermes as the in-pod
+# daedalus pod (B): OpenRC init that runs the native Python Daedalus gateway
+# inside the Podroid VM on guest :8088. Daedalus replaced Hermes as the in-pod
 # agent; it exposes the same surface (`gateway run`, the API_SERVER_* env
 # contract, :8088), so PodroidService's port forward is unchanged. Seeded venv
-# lands at /opt/deadalus via the vendor tarball block below; this just installs
+# lands at /opt/daedalus via the vendor tarball block below; this just installs
 # the script.
-if [ -f /work/files/etc/init.d/podroid-deadalus ]; then
-    cp /work/files/etc/init.d/podroid-deadalus "$ROOTFS/etc/init.d/"
-    chmod +x "$ROOTFS/etc/init.d/podroid-deadalus"
+if [ -f /work/files/etc/init.d/podroid-daedalus ]; then
+    cp /work/files/etc/init.d/podroid-daedalus "$ROOTFS/etc/init.d/"
+    chmod +x "$ROOTFS/etc/init.d/podroid-daedalus"
 fi
 
-# podroid-deadalus-mcp: wires the guest agent to mazemaker via the app MCP proxy
-if [ -f /work/files/etc/init.d/podroid-deadalus-mcp ]; then
-    cp /work/files/etc/init.d/podroid-deadalus-mcp "$ROOTFS/etc/init.d/"
-    chmod +x "$ROOTFS/etc/init.d/podroid-deadalus-mcp"
+# podroid-daedalus-mcp: wires the guest agent to mazemaker via the app MCP proxy
+if [ -f /work/files/etc/init.d/podroid-daedalus-mcp ]; then
+    cp /work/files/etc/init.d/podroid-daedalus-mcp "$ROOTFS/etc/init.d/"
+    chmod +x "$ROOTFS/etc/init.d/podroid-daedalus-mcp"
 fi
 
 # podroid-sshd: holds dropbear back until the shipped default password has
@@ -194,42 +194,42 @@ if [ -f /work/files/usr/local/share/iris/iris-messenger.bin ]; then
     chmod 0644 "$ROOTFS/usr/local/share/iris/iris-messenger.bin" 2>/dev/null || true
 fi
 
-# deadalus pod (B): seed the native Python venv at /opt/deadalus from a vendor
-# tarball produced by build-deadalus-venv.sh (run on the host; builds a musl
+# daedalus pod (B): seed the native Python venv at /opt/daedalus from a vendor
+# tarball produced by build-daedalus-venv.sh (run on the host; builds a musl
 # aarch64 venv under qemu or natively on arm64). The tarball stores paths
-# relative to / (opt/deadalus/...), so `tar -C $ROOTFS -xf` drops it straight
+# relative to / (opt/daedalus/...), so `tar -C $ROOTFS -xf` drops it straight
 # into place. Mirrors the iris-pod vendor-tarball pattern. If absent,
-# podroid-deadalus still installs but start_pre() refuses to start until the
+# podroid-daedalus still installs but start_pre() refuses to start until the
 # venv is seeded.
 #
-# The venv links against the SYSTEM python, and Deadalus is requires-python
+# The venv links against the SYSTEM python, and Daedalus is requires-python
 # >=3.14 while Alpine 3.23 main ships 3.12 — hence the python3@edge pin in the
 # apk block above. Dropping that pin leaves this venv present but unrunnable.
-if [ -f /work/files/usr/local/share/deadalus/deadalus-podroid.tar ]; then
-    mkdir -p "$ROOTFS/opt/deadalus"
-    tar -xf /work/files/usr/local/share/deadalus/deadalus-podroid.tar -C "$ROOTFS"
-    chmod +x "$ROOTFS/opt/deadalus/start.sh" 2>/dev/null || true
+if [ -f /work/files/usr/local/share/daedalus/daedalus-podroid.tar ]; then
+    mkdir -p "$ROOTFS/opt/daedalus"
+    tar -xf /work/files/usr/local/share/daedalus/daedalus-podroid.tar -C "$ROOTFS"
+    chmod +x "$ROOTFS/opt/daedalus/start.sh" 2>/dev/null || true
     # override the tarball start.sh with the repo copy (per-install key gen,
     # no baked secret) + seed the LLM config template (empty api_key).
-    if [ -f /work/files/opt/deadalus/start.sh ]; then
-        cp /work/files/opt/deadalus/start.sh "$ROOTFS/opt/deadalus/start.sh"
-        chmod +x "$ROOTFS/opt/deadalus/start.sh"
+    if [ -f /work/files/opt/daedalus/start.sh ]; then
+        cp /work/files/opt/daedalus/start.sh "$ROOTFS/opt/daedalus/start.sh"
+        chmod +x "$ROOTFS/opt/daedalus/start.sh"
     fi
-    if [ -f /work/files/opt/deadalus/config.template.yaml ]; then
-        cp /work/files/opt/deadalus/config.template.yaml "$ROOTFS/opt/deadalus/config.template.yaml"
+    if [ -f /work/files/opt/daedalus/config.template.yaml ]; then
+        cp /work/files/opt/daedalus/config.template.yaml "$ROOTFS/opt/daedalus/config.template.yaml"
     fi
     # seed the mazemaker MCP watcher alongside the venv (added on top of the tarball)
-    if [ -f /work/files/opt/deadalus/mcp-mazemaker-watch.sh ]; then
-        cp /work/files/opt/deadalus/mcp-mazemaker-watch.sh "$ROOTFS/opt/deadalus/"
-        chmod +x "$ROOTFS/opt/deadalus/mcp-mazemaker-watch.sh"
+    if [ -f /work/files/opt/daedalus/mcp-mazemaker-watch.sh ]; then
+        cp /work/files/opt/daedalus/mcp-mazemaker-watch.sh "$ROOTFS/opt/daedalus/"
+        chmod +x "$ROOTFS/opt/daedalus/mcp-mazemaker-watch.sh"
     fi
     # Put the CLI on the guest's PATH. Without this, opening the Podroid
-    # terminal and typing `deadalus` just says "not found" — the entrypoint
-    # only exists at /opt/deadalus/venv/bin/. /usr/bin and NOT /usr/local/bin:
+    # terminal and typing `daedalus` just says "not found" — the entrypoint
+    # only exists at /opt/daedalus/venv/bin/. /usr/bin and NOT /usr/local/bin:
     # the guest PATH is /usr/sbin:/usr/bin:/sbin:/bin, so a link in
     # /usr/local/bin is invisible.
-    ln -sf /opt/deadalus/venv/bin/deadalus       "$ROOTFS/usr/bin/deadalus"
-    ln -sf /opt/deadalus/venv/bin/deadalus-agent "$ROOTFS/usr/bin/deadalus-agent"
+    ln -sf /opt/daedalus/venv/bin/daedalus       "$ROOTFS/usr/bin/daedalus"
+    ln -sf /opt/daedalus/venv/bin/daedalus-agent "$ROOTFS/usr/bin/daedalus-agent"
 fi
 
 # Copy /usr/local/bin scripts (resize daemon + login wrapper + getty selector)
@@ -277,11 +277,11 @@ cp /work/files/etc/rc.conf "$ROOTFS/etc/rc.conf"
 mkdir -p "$ROOTFS/etc/profile.d"
 cp /work/files/etc/profile.d/podroid-color.sh "$ROOTFS/etc/profile.d/"
 cp /work/files/etc/profile.d/podroid-x11.sh   "$ROOTFS/etc/profile.d/"
-# podroid-deadalus.sh: DEADALUS_HOME, so an interactive `deadalus setup` writes
-# to the same home the service reads. Without it setup lands in /root/.deadalus,
-# the gateway keeps reading /opt/deadalus/deadalus-agent-data, and setup looks
+# podroid-daedalus.sh: DAEDALUS_HOME, so an interactive `daedalus setup` writes
+# to the same home the service reads. Without it setup lands in /root/.daedalus,
+# the gateway keeps reading /opt/daedalus/daedalus-agent-data, and setup looks
 # like it never took.
-cp /work/files/etc/profile.d/podroid-deadalus.sh "$ROOTFS/etc/profile.d/"
+cp /work/files/etc/profile.d/podroid-daedalus.sh "$ROOTFS/etc/profile.d/"
 chmod 0644 "$ROOTFS/etc/profile.d/podroid-color.sh" "$ROOTFS/etc/profile.d/podroid-x11.sh"
 
 # /etc/containers/storage.conf — pin Podman to the in-kernel overlay driver.
@@ -318,7 +318,7 @@ mkdir -p "$ROOTFS/etc/runlevels/default" "$ROOTFS/etc/runlevels/boot"
 # Guard each link: a dangling symlink (e.g. dnsmasq.lxcbr0, which lxc-bridge
 # may ship only as dnsmasq config and not an init script) makes OpenRC log
 # an error every boot and stalls podroid-ready's `after *` on a phantom.
-for svc in podroid-migrate podroid-bootstrap podroid-network podroid-resize podroid-sshd docker lxc dnsmasq.lxcbr0 podroid-x11 podroid-vsock podroid-hostd podroid-ready iris-pod podroid-deadalus podroid-deadalus-mcp; do
+for svc in podroid-migrate podroid-bootstrap podroid-network podroid-resize podroid-sshd docker lxc dnsmasq.lxcbr0 podroid-x11 podroid-vsock podroid-hostd podroid-ready iris-pod podroid-daedalus podroid-daedalus-mcp; do
     if [ -e "$ROOTFS/etc/init.d/$svc" ]; then
         ln -sf "/etc/init.d/$svc" "$ROOTFS/etc/runlevels/default/$svc"
     else

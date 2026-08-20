@@ -1,23 +1,23 @@
 #!/usr/bin/env bash
 # ============================================================================
-# build-deadalus-venv.sh — native aarch64 musl venv of Deadalus for the pod
+# build-daedalus-venv.sh — native aarch64 musl venv of Daedalus for the pod
 # ============================================================================
-# Produces the vendor tarball that build-rootfs.sh seeds into /opt/deadalus
-# inside the Podroid Alpine guest. Deadalus replaces Hermes as the agent that
+# Produces the vendor tarball that build-rootfs.sh seeds into /opt/daedalus
+# inside the Podroid Alpine guest. Daedalus replaces Hermes as the agent that
 # runs in the pod; the surface it exposes is identical (`gateway run`, the
 # API_SERVER_* env contract, :8088), so nothing above it had to change.
 #
 # Output:
-#   files/usr/local/share/deadalus/deadalus-podroid.tar
-#       opt/deadalus/venv/...            the musl aarch64 venv
-#       opt/deadalus/start.sh            launcher, execs `deadalus gateway run`
-#       opt/deadalus/config.template.yaml
+#   files/usr/local/share/daedalus/daedalus-podroid.tar
+#       opt/daedalus/venv/...            the musl aarch64 venv
+#       opt/daedalus/start.sh            launcher, execs `daedalus gateway run`
+#       opt/daedalus/config.template.yaml
 #
 # Paths are stored relative to /, matching hermes-podroid.tar, so build-rootfs
 # extracts it straight into $ROOTFS.
 #
 # PYTHON 3.14, AND WHY IT COMES FROM edge
-#   Deadalus is requires-python >=3.14. Alpine 3.23 main ships python3 3.12.14,
+#   Daedalus is requires-python >=3.14. Alpine 3.23 main ships python3 3.12.14,
 #   so the interpreter is pinned from edge/main (3.14.7). Verified: it installs
 #   onto a 3.23 base without moving musl (stays 1.2.5-r23), i.e. no libc mix.
 #   build-rootfs.sh must install the same python3@edge, because a venv links
@@ -31,21 +31,21 @@
 # without checking what actually changed.
 #
 # Usage:
-#   ./build-deadalus-venv.sh                     # uses DEADALUS_SRC or clones
-#   DEADALUS_SRC=/path/to/deadalus ./build-deadalus-venv.sh
+#   ./build-daedalus-venv.sh                     # uses DAEDALUS_SRC or clones
+#   DAEDALUS_SRC=/path/to/daedalus ./build-daedalus-venv.sh
 #
 # Runs under qemu-aarch64 on an x86_64 host, or natively on arm64.
 # ============================================================================
 set -euo pipefail
 
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-OUT_DIR="${OUT_DIR:-$HERE/files/usr/local/share/deadalus}"
-DEADALUS_SRC="${DEADALUS_SRC:-}"
-DEADALUS_REPO="${DEADALUS_REPO:-https://github.com/itsXactlY/deadalus.git}"
-DEADALUS_REF="${DEADALUS_REF:-main}"
+OUT_DIR="${OUT_DIR:-$HERE/files/usr/local/share/daedalus}"
+DAEDALUS_SRC="${DAEDALUS_SRC:-}"
+DAEDALUS_REPO="${DAEDALUS_REPO:-https://github.com/itsXactlY/daedalus.git}"
+DAEDALUS_REF="${DAEDALUS_REF:-main}"
 ALPINE_TAG="${ALPINE_TAG:-3.23}"
 
-log()  { printf '\033[1;36m[deadalus-venv]\033[0m %s\n' "$*"; }
+log()  { printf '\033[1;36m[daedalus-venv]\033[0m %s\n' "$*"; }
 die()  { printf '\033[1;31m[FATAL]\033[0m %s\n' "$*" >&2; exit 1; }
 
 command -v podman >/dev/null 2>&1 || die "podman not found"
@@ -55,16 +55,16 @@ trap 'rm -rf "$WORK"' EXIT
 
 # ---- resolve source ---------------------------------------------------------
 # Always export via `git archive`: it takes tracked files only, so an agent
-# HOME that doubles as a checkout (~/.deadalus keeps auth.json, sessions/ and
+# HOME that doubles as a checkout (~/.daedalus keeps auth.json, sessions/ and
 # .env there) cannot leak credentials into a tarball that ships to devices.
 SRC_EXPORT="$WORK/src"
 mkdir -p "$SRC_EXPORT"
-if [[ -n "$DEADALUS_SRC" && -d "$DEADALUS_SRC/.git" ]]; then
-    log "exporting tracked files from $DEADALUS_SRC"
-    git -C "$DEADALUS_SRC" archive --format=tar HEAD | tar -x -C "$SRC_EXPORT"
+if [[ -n "$DAEDALUS_SRC" && -d "$DAEDALUS_SRC/.git" ]]; then
+    log "exporting tracked files from $DAEDALUS_SRC"
+    git -C "$DAEDALUS_SRC" archive --format=tar HEAD | tar -x -C "$SRC_EXPORT"
 else
-    log "cloning $DEADALUS_REPO ($DEADALUS_REF)"
-    git clone --depth 1 -b "$DEADALUS_REF" "$DEADALUS_REPO" "$WORK/clone" >/dev/null 2>&1 \
+    log "cloning $DAEDALUS_REPO ($DAEDALUS_REF)"
+    git clone --depth 1 -b "$DAEDALUS_REF" "$DAEDALUS_REPO" "$WORK/clone" >/dev/null 2>&1 \
         || die "clone failed"
     git -C "$WORK/clone" archive --format=tar HEAD | tar -x -C "$SRC_EXPORT"
 fi
@@ -97,22 +97,22 @@ echo "[guest] $(uname -m)  $PY"
 # writable — a :ro mount fails here for a reason unrelated to musl or arm64.
 cp -a /src /build
 
-python3 -m venv /opt/deadalus/venv
-/opt/deadalus/venv/bin/python -m pip install -q --upgrade pip >/dev/null 2>&1
-/opt/deadalus/venv/bin/pip install --no-cache-dir /build
+python3 -m venv /opt/daedalus/venv
+/opt/daedalus/venv/bin/python -m pip install -q --upgrade pip >/dev/null 2>&1
+/opt/daedalus/venv/bin/pip install --no-cache-dir /build
 
-test -x /opt/deadalus/venv/bin/deadalus || { echo "FATAL: no deadalus entrypoint" >&2; exit 1; }
-/opt/deadalus/venv/bin/deadalus gateway --help >/dev/null 2>&1 \
-    || { echo "FATAL: deadalus gateway --help failed" >&2; exit 1; }
+test -x /opt/daedalus/venv/bin/daedalus || { echo "FATAL: no daedalus entrypoint" >&2; exit 1; }
+/opt/daedalus/venv/bin/daedalus gateway --help >/dev/null 2>&1 \
+    || { echo "FATAL: daedalus gateway --help failed" >&2; exit 1; }
 
-mkdir -p /opt/deadalus/deadalus-agent-data
-tar -cf /out/deadalus-podroid.tar -C / opt/deadalus
+mkdir -p /opt/daedalus/daedalus-agent-data
+tar -cf /out/daedalus-podroid.tar -C / opt/daedalus
 ' || die "venv build failed"
 
-[[ -f "$WORK/out/deadalus-podroid.tar" ]] || die "tarball not produced"
+[[ -f "$WORK/out/daedalus-podroid.tar" ]] || die "tarball not produced"
 
 # start.sh + config template are appended from the rootfs overlay so they stay
 # editable in git rather than baked inside the tarball.
-mv "$WORK/out/deadalus-podroid.tar" "$OUT_DIR/deadalus-podroid.tar"
-log "wrote $OUT_DIR/deadalus-podroid.tar ($(du -h "$OUT_DIR/deadalus-podroid.tar" | cut -f1))"
-log "entries: $(tar -tf "$OUT_DIR/deadalus-podroid.tar" | wc -l)"
+mv "$WORK/out/daedalus-podroid.tar" "$OUT_DIR/daedalus-podroid.tar"
+log "wrote $OUT_DIR/daedalus-podroid.tar ($(du -h "$OUT_DIR/daedalus-podroid.tar" | cut -f1))"
+log "entries: $(tar -tf "$OUT_DIR/daedalus-podroid.tar" | wc -l)"

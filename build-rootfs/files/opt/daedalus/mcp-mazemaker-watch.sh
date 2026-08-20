@@ -1,13 +1,13 @@
 #!/bin/sh
-# mcp-mazemaker-watch.sh — wire the guest's deadalus to the operator's setup over
+# mcp-mazemaker-watch.sh — wire the guest's daedalus to the operator's setup over
 # the app's on-device proxy, with NO hardcoded IP (URL derived from the live
 # default gateway = the TAP host).
 #
 # Two jobs, one poll loop and one gateway discovery:
 #
 #   mcp_servers.mazemaker  <- the proxy's /mcp endpoint, so the agent can reach
-#                             the desktop memory. Also restarts deadalus when the
-#                             proxy appears, because deadalus retries an MCP
+#                             the desktop memory. Also restarts daedalus when the
+#                             proxy appears, because daedalus retries an MCP
 #                             server only 3x at startup then gives up.
 #   model + providers      <- the proxy's /agent-config endpoint (config push),
 #                             so the operator does not type an LLM endpoint into
@@ -15,10 +15,10 @@
 #                             host; the KEY comes from the app, because the
 #                             desktop bridge redacts secrets by design.
 
-DEADALUS_HOME="${DEADALUS_HOME:-/opt/deadalus/deadalus-agent-data}"
-VENV_PY=/opt/deadalus/venv/bin/python3
-CONFIG="$DEADALUS_HOME/config.yaml"
-AGENT_LOG="$DEADALUS_HOME/logs/agent.log"
+DAEDALUS_HOME="${DAEDALUS_HOME:-/opt/daedalus/daedalus-agent-data}"
+VENV_PY=/opt/daedalus/venv/bin/python3
+CONFIG="$DAEDALUS_HOME/config.yaml"
+AGENT_LOG="$DAEDALUS_HOME/logs/agent.log"
 PORT=8790
 POLL=15
 SETTLE=45
@@ -106,7 +106,7 @@ proxy_reachable() {
         -d '{"jsonrpc":"2.0","id":1,"method":"tools/list"}' 2>/dev/null
 }
 
-deadalus_mcp_servers() {
+daedalus_mcp_servers() {
     [ -f "$AGENT_LOG" ] || { echo 0; return; }
     n=$(grep 'MCP: registered' "$AGENT_LOG" 2>/dev/null | tail -1 | sed -n 's/.*from \([0-9][0-9]*\) server.*/\1/p')
     echo "${n:-0}"
@@ -121,12 +121,12 @@ while :; do
         # restarted anyway, and doing both restarts separately would bounce
         # the agent twice in one tick.
         if pull_agent_config "$gw"; then
-            echo "[mcp-watch] agent-config changed — restarting podroid-deadalus"
-            rc-service podroid-deadalus restart >/dev/null 2>&1 || true
+            echo "[mcp-watch] agent-config changed — restarting podroid-daedalus"
+            rc-service podroid-daedalus restart >/dev/null 2>&1 || true
             sleep "$SETTLE"
-        elif [ "$(deadalus_mcp_servers)" -lt 1 ] && pgrep -f 'deadalus gateway run' >/dev/null 2>&1; then
-            echo "[mcp-watch] proxy up at $gw:$PORT, deadalus has no mazemaker tools — restarting podroid-deadalus"
-            rc-service podroid-deadalus restart >/dev/null 2>&1 || true
+        elif [ "$(daedalus_mcp_servers)" -lt 1 ] && pgrep -f 'daedalus gateway run' >/dev/null 2>&1; then
+            echo "[mcp-watch] proxy up at $gw:$PORT, daedalus has no mazemaker tools — restarting podroid-daedalus"
+            rc-service podroid-daedalus restart >/dev/null 2>&1 || true
             sleep "$SETTLE"
         fi
     fi

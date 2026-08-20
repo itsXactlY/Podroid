@@ -1,6 +1,6 @@
 #!/sbin/openrc-run
 # ────────────────────────────────────────────────────────────────────
-# podroid-deadalus-mcp — wires the guest Deadalus to the operator's
+# podroid-daedalus-mcp — wires the guest Daedalus to the operator's
 # mazemaker memory, with NO hardcoded IP.
 #
 # The mazemaker Android app (dev.mazemaker.mobile) runs an MCP proxy bound to
@@ -10,33 +10,33 @@
 # (the TAP host), so the URL is resolved at runtime — nothing is baked.
 #
 # This service:
-#   - seeds mcp_servers.mazemaker into Deadalus' config.yaml (URL from the live
+#   - seeds mcp_servers.mazemaker into Daedalus' config.yaml (URL from the live
 #     default gateway + the shared port 8790), and
-#   - restarts podroid-deadalus once whenever the proxy becomes reachable but
-#     Deadalus has not loaded the mazemaker tools — because Deadalus only retries an
+#   - restarts podroid-daedalus once whenever the proxy becomes reachable but
+#     Daedalus has not loaded the mazemaker tools — because Daedalus only retries an
 #     MCP server 3x at startup then gives up for the session, and the proxy only
 #     exists while the app is open (which may be after the pod boots).
 #
-# Deadalus chat works without this (OpenRouter upstream); the mazemaker memory is
-# the bonus that lights up when the app is open. So this never blocks Deadalus.
+# Daedalus chat works without this (OpenRouter upstream); the mazemaker memory is
+# the bonus that lights up when the app is open. So this never blocks Daedalus.
 # ────────────────────────────────────────────────────────────────────
 
-name="podroid-deadalus-mcp"
-description="Wire Deadalus to mazemaker via the app's on-device MCP proxy"
+name="podroid-daedalus-mcp"
+description="Wire Daedalus to mazemaker via the app's on-device MCP proxy"
 
-command="/opt/deadalus/mcp-mazemaker-watch.sh"
+command="/opt/daedalus/mcp-mazemaker-watch.sh"
 command_background="yes"
 pidfile="/run/${name}.pid"
 start_stop_daemon_args="--background --make-pidfile --pidfile ${pidfile}"
 
 depend() {
     need net
-    after podroid-network podroid-deadalus
+    after podroid-network podroid-daedalus
 }
 
 start_pre() {
-    if [ ! -x /opt/deadalus/mcp-mazemaker-watch.sh ]; then
-        eerror "mcp-mazemaker-watch.sh missing at /opt/deadalus/ — seed it first"
+    if [ ! -x /opt/daedalus/mcp-mazemaker-watch.sh ]; then
+        eerror "mcp-mazemaker-watch.sh missing at /opt/daedalus/ — seed it first"
         return 1
     fi
 }

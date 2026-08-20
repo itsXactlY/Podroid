@@ -1,29 +1,29 @@
 #!/sbin/openrc-run
 # ────────────────────────────────────────────────────────────────────
-# podroid-deadalus — OpenRC init script for the Deadalus gateway
+# podroid-daedalus — OpenRC init script for the Daedalus gateway
 # running INSIDE the Podroid Alpine VM.
 #
-# This file lives at /etc/init.d/podroid-deadalus inside the guest. Podroid's
+# This file lives at /etc/init.d/podroid-daedalus inside the guest. Podroid's
 # build-rootfs overlay mechanism (android/podroid/build-rootfs/files/) makes
 # it trivial to inject custom init scripts into the squashfs — the exact
 # pattern iris-pod uses for iris-messenger.
 #
 # Lifecycle:
-#   - start:  run /opt/deadalus/start.sh, which exports API_SERVER_* and execs
-#             `/opt/deadalus/venv/bin/deadalus gateway run` on 0.0.0.0:8088.
-#   - stop:   s-s-d kills the deadalus process (pidfile /run/podroid-deadalus.pid).
-#   - status: pgrep -f "deadalus gateway run"
+#   - start:  run /opt/daedalus/start.sh, which exports API_SERVER_* and execs
+#             `/opt/daedalus/venv/bin/daedalus gateway run` on 0.0.0.0:8088.
+#   - stop:   s-s-d kills the daedalus process (pidfile /run/podroid-daedalus.pid).
+#   - status: pgrep -f "daedalus gateway run"
 #
-# The Deadalus gateway answers HTTP on the guest's :8088. PodroidService adds
+# The Daedalus gateway answers HTTP on the guest's :8088. PodroidService adds
 # an implicit loopback-only port forward (host 127.0.0.1:8088 → guest :8088)
 # so the Android-side client (mazemaker app) reaches it at 127.0.0.1:8088
 # without crossing the LAN.
 # ────────────────────────────────────────────────────────────────────
 
-name="podroid-deadalus"
-description="Deadalus gateway (native Python pod on Podroid)"
+name="podroid-daedalus"
+description="Daedalus gateway (native Python pod on Podroid)"
 
-command="/opt/deadalus/start.sh"
+command="/opt/daedalus/start.sh"
 command_background="yes"
 pidfile="/run/${name}.pid"
 start_stop_daemon_args="--background --make-pidfile --pidfile ${pidfile}"
@@ -34,9 +34,9 @@ depend() {
 }
 
 start_pre() {
-    if [ ! -x /opt/deadalus/start.sh ]; then
-        eerror "deadalus start.sh missing at /opt/deadalus/start.sh — seed the venv first"
+    if [ ! -x /opt/daedalus/start.sh ]; then
+        eerror "daedalus start.sh missing at /opt/daedalus/start.sh — seed the venv first"
         return 1
     fi
-    mkdir -p /opt/deadalus/deadalus-agent-data
+    mkdir -p /opt/daedalus/daedalus-agent-data
 }
