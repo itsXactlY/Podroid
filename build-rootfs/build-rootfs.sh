@@ -212,6 +212,13 @@ if [ -f /work/files/usr/local/share/deadalus/deadalus-podroid.tar ]; then
         cp /work/files/opt/deadalus/mcp-mazemaker-watch.sh "$ROOTFS/opt/deadalus/"
         chmod +x "$ROOTFS/opt/deadalus/mcp-mazemaker-watch.sh"
     fi
+    # Put the CLI on the guest's PATH. Without this, opening the Podroid
+    # terminal and typing `deadalus` just says "not found" — the entrypoint
+    # only exists at /opt/deadalus/venv/bin/. /usr/bin and NOT /usr/local/bin:
+    # the guest PATH is /usr/sbin:/usr/bin:/sbin:/bin, so a link in
+    # /usr/local/bin is invisible.
+    ln -sf /opt/deadalus/venv/bin/deadalus       "$ROOTFS/usr/bin/deadalus"
+    ln -sf /opt/deadalus/venv/bin/deadalus-agent "$ROOTFS/usr/bin/deadalus-agent"
 fi
 
 # Copy /usr/local/bin scripts (resize daemon + login wrapper + getty selector)
