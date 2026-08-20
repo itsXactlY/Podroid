@@ -139,6 +139,17 @@ if [ -f /work/files/etc/init.d/podroid-deadalus-mcp ]; then
     chmod +x "$ROOTFS/etc/init.d/podroid-deadalus-mcp"
 fi
 
+# podroid-sshd: holds dropbear back until the shipped default password has
+# been replaced. dropbear authenticates straight against /etc/shadow and
+# never goes through /bin/login, so without this gate SSH walked around the
+# forced password change that podroid-login performs on the console.
+# dropbear is therefore no longer in the default runlevel; this gate is, and
+# it starts dropbear once /etc/podroid/password-set exists.
+if [ -f /work/files/etc/init.d/podroid-sshd ]; then
+    cp /work/files/etc/init.d/podroid-sshd "$ROOTFS/etc/init.d/"
+    chmod +x "$ROOTFS/etc/init.d/podroid-sshd"
+fi
+
 # iris-pod: the OpenRC init that runs the iris-messenger container inside
 # the Podroid VM. Source lives in /home/alca/projects/jrwl-messenger/
 # android/vm-image/overlay/etc/init.d/iris-pod (same overlay that builds
@@ -291,8 +302,11 @@ cat > "$ROOTFS/etc/issue" <<'EOF'
 Welcome to Podroid (Alpine \S)
 Kernel \r on \m (\l)
 
-  Default login:  root  /  podroid
-  Change root password:    passwd
+  First login:    root  —  you will be asked to set a password
+                          before you get a shell. The old default is
+                          refused, and SSH stays off until it is set.
+
+  Change it later:         passwd
   Create a regular user:   adduser -G wheel <name>
                            (wheel group → can run doas/sudo)
 
@@ -304,7 +318,7 @@ mkdir -p "$ROOTFS/etc/runlevels/default" "$ROOTFS/etc/runlevels/boot"
 # Guard each link: a dangling symlink (e.g. dnsmasq.lxcbr0, which lxc-bridge
 # may ship only as dnsmasq config and not an init script) makes OpenRC log
 # an error every boot and stalls podroid-ready's `after *` on a phantom.
-for svc in podroid-migrate podroid-bootstrap podroid-network podroid-resize dropbear docker lxc dnsmasq.lxcbr0 podroid-x11 podroid-vsock podroid-hostd podroid-ready iris-pod podroid-deadalus podroid-deadalus-mcp; do
+for svc in podroid-migrate podroid-bootstrap podroid-network podroid-resize podroid-sshd docker lxc dnsmasq.lxcbr0 podroid-x11 podroid-vsock podroid-hostd podroid-ready iris-pod podroid-deadalus podroid-deadalus-mcp; do
     if [ -e "$ROOTFS/etc/init.d/$svc" ]; then
         ln -sf "/etc/init.d/$svc" "$ROOTFS/etc/runlevels/default/$svc"
     else

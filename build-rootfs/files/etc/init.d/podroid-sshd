@@ -1,0 +1,59 @@
+#!/sbin/openrc-run
+# ────────────────────────────────────────────────────────────────────
+# podroid-sshd — hold SSH back until the shipped default password is gone.
+#
+# WHY THIS EXISTS
+# podroid-login forces the operator to replace the documented default
+# (root/podroid) on the first console session. That closes the console, but
+# dropbear authenticates straight against /etc/shadow and never goes through
+# /bin/login — so SSH on :9922 happily accepted root/podroid and walked
+# around the whole requirement. A rule that only covers one of two doors is
+# not a rule.
+#
+# So dropbear is NOT in the default runlevel any more. This gate is, and it
+# starts dropbear only once /etc/podroid/password-set exists. That marker is
+# written by podroid-login the moment a new password is accepted, and
+# podroid-login also starts this service immediately, so SSH comes up in the
+# same session rather than at the next boot.
+#
+# Deliberately returns 0 when it withholds SSH: a device that has not been
+# provisioned yet is a normal state, not a boot failure, and failing here
+# would drag the rest of the runlevel down with it.
+#
+# To re-provision (forces both the password prompt and this gate again):
+#     rm /etc/podroid/password-set
+# ────────────────────────────────────────────────────────────────────
+
+name="podroid-sshd"
+description="Start SSH only after the default password has been replaced"
+
+depend() {
+    need net
+    after podroid-network podroid-bootstrap
+}
+
+start() {
+    if [ ! -f /etc/podroid/password-set ]; then
+        ewarn "SSH withheld — the shipped default password is still in place."
+        ewarn "Open the Podroid terminal once and set your own password."
+        ewarn "SSH starts by itself as soon as that is done."
+        return 0
+    fi
+
+    ebegin "Starting SSH (password has been replaced)"
+    rc-service dropbear start >/dev/null 2>&1
+    eend $? "dropbear failed to start"
+}
+
+stop() {
+    rc-service dropbear stop >/dev/null 2>&1
+    return 0
+}
+
+status() {
+    if [ ! -f /etc/podroid/password-set ]; then
+        einfo "withheld — default password not yet replaced"
+        return 0
+    fi
+    rc-service dropbear status
+}

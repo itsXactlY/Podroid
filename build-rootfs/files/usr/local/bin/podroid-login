@@ -87,6 +87,10 @@ if [ ! -f /etc/podroid/password-set ]; then
             : > /etc/podroid/password-set
             chmod 0644 /etc/podroid/password-set
             printf '  Password set. Log in with it now.\n\n'
+            # SSH was withheld while the default was in place (see
+            # /etc/init.d/podroid-sshd). Bring it up now rather than at the
+            # next boot, so provisioning finishes in one session.
+            rc-service podroid-sshd start >/dev/null 2>&1 || true
             unset _pw1 _pw2
             break
         fi
