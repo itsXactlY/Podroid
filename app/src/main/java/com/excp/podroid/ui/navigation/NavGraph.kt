@@ -38,6 +38,10 @@ fun PodroidNavGraph(
     // because skipping SETUP would strand a fresh install on a screen it
     // cannot use.
     startRouteOverride: String? = null,
+    // Set when the Deadalus icon is tapped while the app is already running.
+    // Consumed (reset to null) once acted on, so returning to the app later
+    // does not yank the operator back to the terminal.
+    routeRequest: androidx.compose.runtime.MutableState<String?>? = null,
 ) {
     // Read isSetupDone from a Hilt-scoped helper so MainActivity doesn't need
     // a field-injected SettingsRepository just to drive the start destination.
@@ -52,6 +56,18 @@ fun PodroidNavGraph(
         true  -> startRouteOverride ?: Routes.HOME
         false -> Routes.SETUP
         null  -> return
+    }
+
+    if (routeRequest != null) {
+        val requested = routeRequest.value
+        androidx.compose.runtime.LaunchedEffect(requested) {
+            if (requested != null) {
+                if (navController.currentDestination?.route != requested) {
+                    navController.navigate(requested) { launchSingleTop = true }
+                }
+                routeRequest.value = null
+            }
+        }
     }
 
     NavHost(

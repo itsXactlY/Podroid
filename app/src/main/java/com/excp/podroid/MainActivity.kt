@@ -31,6 +31,28 @@ class MainActivity : FragmentActivity() {
         const val DEADALUS_ALIAS = "DeadalusTerminalAlias"
     }
 
+    /**
+     * Route the launcher asked for, or null for a normal start.
+     *
+     * This is state, not a value read once in onCreate: when the app is already
+     * running, tapping the Deadalus icon delivers the intent to the existing
+     * task via onNewIntent and onCreate never runs again. Reading the intent
+     * only in onCreate made the icon work on a cold start and silently resume
+     * whatever screen was last open otherwise.
+     */
+    private val routeRequest = androidx.compose.runtime.mutableStateOf<String?>(null)
+
+    private fun routeFor(i: android.content.Intent?): String? =
+        if (i?.component?.className?.endsWith(DEADALUS_ALIAS) == true)
+            com.excp.podroid.ui.navigation.Routes.TERMINAL
+        else null
+
+    override fun onNewIntent(intent: android.content.Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        routeFor(intent)?.let { routeRequest.value = it }
+    }
+
     override fun attachBaseContext(newBase: Context?) {
         val base = newBase ?: return super.attachBaseContext(null)
         val savedLang = LanguageManager.getSavedLanguage(base)
@@ -41,6 +63,7 @@ class MainActivity : FragmentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         enableEdgeToEdge()
         super.onCreate(savedInstanceState)
+        routeRequest.value = routeFor(intent)
         setContent {
             val windowSizeClass = calculateWindowSizeClass(this)
             val navVm: NavGraphViewModel = hiltViewModel()
@@ -90,13 +113,10 @@ class MainActivity : FragmentActivity() {
                         // Launched from the "Deadalus" icon? An activity-alias
                         // cannot carry intent extras, but it does show up as the
                         // component that started us — so switch on that.
-                        val startRoute =
-                            if (intent?.component?.className?.endsWith(DEADALUS_ALIAS) == true)
-                                com.excp.podroid.ui.navigation.Routes.TERMINAL
-                            else null
                         PodroidNavGraph(
                             windowSizeClass = windowSizeClass,
-                            startRouteOverride = startRoute,
+                            startRouteOverride = routeFor(intent),
+                            routeRequest = routeRequest,
                         )
                         if (headlessActive) {
                             com.excp.podroid.ui.components.HeadlessOverlay(onExit = { headlessVm.disable() })
