@@ -20,4 +20,78 @@ fi
 case "$_r" in ''|*[!0-9]*|0) _r=24;; esac
 case "$_c" in ''|*[!0-9]*|0) _c=80;; esac
 stty rows "$_r" cols "$_c" 2>/dev/null
+# ── Mandatory first-run password change ─────────────────────────────────
+# The image ships a documented default (root/podroid). A documented default
+# on a box that also runs an agent gateway is a credential everyone knows,
+# so the first console session must replace it before anything else happens.
+# There is no skip: the loop only exits once a new password is accepted.
+#
+# This runs as root (getty invokes us as its login program) and therefore
+# before /bin/login, which is what makes it unskippable from the terminal.
+#
+# Undo for a re-provision:  rm /etc/podroid/password-set
+if [ ! -f /etc/podroid/password-set ]; then
+    printf '\n'
+    printf '  ####################################################\n'
+    printf '  #  Podroid first-run: set a password               #\n'
+    printf '  ####################################################\n'
+    printf '\n'
+    printf '  This image ships with a documented default login.\n'
+    printf '  It must be replaced before you get a shell.\n'
+    printf '\n'
+    printf '  Requirements: at least 12 characters, and not the\n'
+    printf '  default. Choose something only you know.\n'
+    printf '\n'
+
+    while :; do
+        printf '  New root password: '
+        stty -echo 2>/dev/null
+        read _pw1
+        stty echo 2>/dev/null
+        printf '\n  Repeat: '
+        stty -echo 2>/dev/null
+        read _pw2
+        stty echo 2>/dev/null
+        printf '\n'
+
+        if [ "$_pw1" != "$_pw2" ]; then
+            printf '  -> They do not match. Again.\n\n'
+            continue
+        fi
+        # Rejected outright: the shipped default and its obvious variants.
+        case "$_pw1" in
+            podroid|Podroid|podroid123|root|toor|alpine|admin|password|changeme)
+                printf '  -> That is a default/known password. Refused.\n\n'
+                continue ;;
+        esac
+        if [ "${#_pw1}" -lt 12 ]; then
+            printf '  -> Too short (%s chars, need 12+). Again.\n\n' "${#_pw1}"
+            continue
+        fi
+        # Reject a single character class (all digits / all lower / all upper).
+        case "$_pw1" in
+            *[!0-9]*) ;;
+            *) printf '  -> Digits only. Add letters or symbols.\n\n'; continue ;;
+        esac
+        case "$_pw1" in
+            *[!a-z]*) ;;
+            *) printf '  -> Lowercase only. Add digits, capitals or symbols.\n\n'; continue ;;
+        esac
+        case "$_pw1" in
+            *[!A-Z]*) ;;
+            *) printf '  -> Uppercase only. Add digits, lowercase or symbols.\n\n'; continue ;;
+        esac
+
+        if printf 'root:%s\n' "$_pw1" | chpasswd >/dev/null 2>&1; then
+            mkdir -p /etc/podroid
+            : > /etc/podroid/password-set
+            chmod 0644 /etc/podroid/password-set
+            printf '  Password set. Log in with it now.\n\n'
+            unset _pw1 _pw2
+            break
+        fi
+        printf '  -> chpasswd failed. Again.\n\n'
+    done
+fi
+
 exec /bin/login "$@"

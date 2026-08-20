@@ -266,6 +266,11 @@ cp /work/files/etc/rc.conf "$ROOTFS/etc/rc.conf"
 mkdir -p "$ROOTFS/etc/profile.d"
 cp /work/files/etc/profile.d/podroid-color.sh "$ROOTFS/etc/profile.d/"
 cp /work/files/etc/profile.d/podroid-x11.sh   "$ROOTFS/etc/profile.d/"
+# podroid-deadalus.sh: DEADALUS_HOME, so an interactive `deadalus setup` writes
+# to the same home the service reads. Without it setup lands in /root/.deadalus,
+# the gateway keeps reading /opt/deadalus/deadalus-agent-data, and setup looks
+# like it never took.
+cp /work/files/etc/profile.d/podroid-deadalus.sh "$ROOTFS/etc/profile.d/"
 chmod 0644 "$ROOTFS/etc/profile.d/podroid-color.sh" "$ROOTFS/etc/profile.d/podroid-x11.sh"
 
 # /etc/containers/storage.conf — pin Podman to the in-kernel overlay driver.
