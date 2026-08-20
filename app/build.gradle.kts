@@ -61,6 +61,19 @@ android {
             // PODROID_RELEASE_* Gradle properties.
             val propsPath = (project.findProperty("PODROID_KEYSTORE_PROPERTIES") as? String)
             val propsFile = propsPath?.let { file(it) }
+            // Naming a props file that does not exist is always a mistake --
+            // a typo'd path, or a placeholder pasted verbatim. Silently falling
+            // through to the PODROID_RELEASE_* branch (which is also unset, so
+            // the whole config stays empty) buries that in a packageRelease
+            // failure three minutes later reading
+            //     SigningConfig "release" is missing required property "storeFile"
+            // which names neither the property that was passed nor the path it
+            // could not find. Fail here, where the cause is still visible.
+            if (propsPath != null && (propsFile == null || !propsFile.exists())) {
+                throw GradleException(
+                    "PODROID_KEYSTORE_PROPERTIES points at a file that does not exist: $propsPath"
+                )
+            }
             if (propsFile != null && propsFile.exists()) {
                 val p = Properties().apply { propsFile.inputStream().use { s -> load(s) } }
                 storeFile     = propsFile.parentFile.resolve(p.getProperty("storeFile"))
@@ -69,6 +82,11 @@ android {
                 keyPassword   = p.getProperty("keyPassword")
             } else {
                 val storePath = (project.findProperty("PODROID_RELEASE_STORE_FILE") as? String)
+                if (storePath != null && !file(storePath).exists()) {
+                    throw GradleException(
+                        "PODROID_RELEASE_STORE_FILE points at a file that does not exist: $storePath"
+                    )
+                }
                 if (storePath != null && file(storePath).exists()) {
                     storeFile     = file(storePath)
                     storePassword = project.findProperty("PODROID_RELEASE_STORE_PASSWORD") as? String
