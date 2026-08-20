@@ -1,13 +1,13 @@
 #!/bin/sh
-# mcp-mazemaker-watch.sh — wire the guest's hermes to mazemaker over the app's
+# mcp-mazemaker-watch.sh — wire the guest's deadalus to mazemaker over the app's
 # on-device MCP proxy, with NO hardcoded IP (URL derived from the live default
-# gateway = the TAP host). Also restarts hermes when the proxy appears, because
-# hermes only retries an MCP server 3x at startup then gives up for the session.
+# gateway = the TAP host). Also restarts deadalus when the proxy appears, because
+# deadalus only retries an MCP server 3x at startup then gives up for the session.
 
-HERMES_HOME="${HERMES_HOME:-/opt/hermes/hermes-agent-data}"
-VENV_PY=/opt/hermes/venv/bin/python3
-CONFIG="$HERMES_HOME/config.yaml"
-AGENT_LOG="$HERMES_HOME/logs/agent.log"
+DEADALUS_HOME="${DEADALUS_HOME:-/opt/deadalus/deadalus-agent-data}"
+VENV_PY=/opt/deadalus/venv/bin/python3
+CONFIG="$DEADALUS_HOME/config.yaml"
+AGENT_LOG="$DEADALUS_HOME/logs/agent.log"
 PORT=8790
 POLL=15
 SETTLE=45
@@ -39,7 +39,7 @@ proxy_reachable() {
         -d '{"jsonrpc":"2.0","id":1,"method":"tools/list"}' 2>/dev/null
 }
 
-hermes_mcp_servers() {
+deadalus_mcp_servers() {
     [ -f "$AGENT_LOG" ] || { echo 0; return; }
     n=$(grep 'MCP: registered' "$AGENT_LOG" 2>/dev/null | tail -1 | sed -n 's/.*from \([0-9][0-9]*\) server.*/\1/p')
     echo "${n:-0}"
@@ -50,9 +50,9 @@ while :; do
     gw="$(default_gw)"
     write_config "$gw" >/dev/null 2>&1 || true
     if proxy_reachable "$gw"; then
-        if [ "$(hermes_mcp_servers)" -lt 1 ] && pgrep -f 'hermes gateway run' >/dev/null 2>&1; then
-            echo "[mcp-watch] proxy up at $gw:$PORT, hermes has no mazemaker tools — restarting podroid-hermes"
-            rc-service podroid-hermes restart >/dev/null 2>&1 || true
+        if [ "$(deadalus_mcp_servers)" -lt 1 ] && pgrep -f 'deadalus gateway run' >/dev/null 2>&1; then
+            echo "[mcp-watch] proxy up at $gw:$PORT, deadalus has no mazemaker tools — restarting podroid-deadalus"
+            rc-service podroid-deadalus restart >/dev/null 2>&1 || true
             sleep "$SETTLE"
         fi
     fi

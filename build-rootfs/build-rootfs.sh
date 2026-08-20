@@ -8,13 +8,21 @@ ROOTFS=/work/rootfs
 ALPINE_BRANCH="${ALPINE_VERSION%.*}"
 
 mkdir -p "$ROOTFS/etc/apk"
+# The edge entry is TAGGED (@edge), not a plain repo line: apk only pulls from
+# it for packages asked for as pkg@edge. Everything else stays on v$ALPINE_BRANCH,
+# so this does not turn the guest into a rolling release. It exists for one
+# package — python3 3.14, which Deadalus requires and 3.23 main does not carry
+# (it ships 3.12). Verified: python3@edge installs without moving musl off
+# 1.2.5-r23, so there is no libc mix.
 cat > "$ROOTFS/etc/apk/repositories" <<EOF
 https://dl-cdn.alpinelinux.org/alpine/v${ALPINE_BRANCH}/main
 https://dl-cdn.alpinelinux.org/alpine/v${ALPINE_BRANCH}/community
+@edge https://dl-cdn.alpinelinux.org/alpine/edge/main
 EOF
 
 apk -X "https://dl-cdn.alpinelinux.org/alpine/v${ALPINE_BRANCH}/main" \
     -X "https://dl-cdn.alpinelinux.org/alpine/v${ALPINE_BRANCH}/community" \
+    -X "@edge https://dl-cdn.alpinelinux.org/alpine/edge/main" \
     -U --allow-untrusted --root "$ROOTFS" --initdb add \
     alpine-base \
     openrc \
@@ -39,7 +47,7 @@ apk -X "https://dl-cdn.alpinelinux.org/alpine/v${ALPINE_BRANCH}/main" \
     libcap-utils \
     doas sudo \
     gcompat \
-    python3 \
+    python3@edge \
     gzip \
     xz \
     tigervnc \
@@ -114,18 +122,21 @@ cp /work/files/etc/init.d/podroid-hostd     "$ROOTFS/etc/init.d/"
 cp /work/files/etc/init.d/podroid-migrate   "$ROOTFS/etc/init.d/"
 chmod +x "$ROOTFS/etc/init.d/podroid-"*
 
-# hermes-agent pod (B): OpenRC init that runs the native Python Hermes Agent
-# gateway inside the Podroid VM on guest :8088. Seeded venv lands at
-# /opt/hermes via the vendor tarball block below; this just installs the script.
-if [ -f /work/files/etc/init.d/podroid-hermes ]; then
-    cp /work/files/etc/init.d/podroid-hermes "$ROOTFS/etc/init.d/"
-    chmod +x "$ROOTFS/etc/init.d/podroid-hermes"
+# deadalus pod (B): OpenRC init that runs the native Python Deadalus gateway
+# inside the Podroid VM on guest :8088. Deadalus replaced Hermes as the in-pod
+# agent; it exposes the same surface (`gateway run`, the API_SERVER_* env
+# contract, :8088), so PodroidService's port forward is unchanged. Seeded venv
+# lands at /opt/deadalus via the vendor tarball block below; this just installs
+# the script.
+if [ -f /work/files/etc/init.d/podroid-deadalus ]; then
+    cp /work/files/etc/init.d/podroid-deadalus "$ROOTFS/etc/init.d/"
+    chmod +x "$ROOTFS/etc/init.d/podroid-deadalus"
 fi
 
-# podroid-hermes-mcp: wires guest hermes to mazemaker via the app MCP proxy
-if [ -f /work/files/etc/init.d/podroid-hermes-mcp ]; then
-    cp /work/files/etc/init.d/podroid-hermes-mcp "$ROOTFS/etc/init.d/"
-    chmod +x "$ROOTFS/etc/init.d/podroid-hermes-mcp"
+# podroid-deadalus-mcp: wires the guest agent to mazemaker via the app MCP proxy
+if [ -f /work/files/etc/init.d/podroid-deadalus-mcp ]; then
+    cp /work/files/etc/init.d/podroid-deadalus-mcp "$ROOTFS/etc/init.d/"
+    chmod +x "$ROOTFS/etc/init.d/podroid-deadalus-mcp"
 fi
 
 # iris-pod: the OpenRC init that runs the iris-messenger container inside
@@ -172,30 +183,34 @@ if [ -f /work/files/usr/local/share/iris/iris-messenger.bin ]; then
     chmod 0644 "$ROOTFS/usr/local/share/iris/iris-messenger.bin" 2>/dev/null || true
 fi
 
-# hermes-agent pod (B): seed the native Python venv at /opt/hermes from a
-# vendor tarball produced by the podroid-hermes build (build_rootfs_native.sh
-# on the host). The tarball stores paths relative to / (opt/hermes/...), so
-# `tar -C $ROOTFS -xf` drops it straight into place. Mirrors the iris-pod
-# vendor-tarball pattern. If absent, podroid-hermes still installs but
-# start_pre() refuses to start until the venv is seeded.
-if [ -f /work/files/usr/local/share/hermes/hermes-podroid.tar ]; then
-    mkdir -p "$ROOTFS/opt/hermes"
-    tar -xf /work/files/usr/local/share/hermes/hermes-podroid.tar -C "$ROOTFS"
-    chmod +x "$ROOTFS/opt/hermes/start.sh" 2>/dev/null || true
-    chmod +x "$ROOTFS/opt/hermes/hermes-agent.bin" 2>/dev/null || true
+# deadalus pod (B): seed the native Python venv at /opt/deadalus from a vendor
+# tarball produced by build-deadalus-venv.sh (run on the host; builds a musl
+# aarch64 venv under qemu or natively on arm64). The tarball stores paths
+# relative to / (opt/deadalus/...), so `tar -C $ROOTFS -xf` drops it straight
+# into place. Mirrors the iris-pod vendor-tarball pattern. If absent,
+# podroid-deadalus still installs but start_pre() refuses to start until the
+# venv is seeded.
+#
+# The venv links against the SYSTEM python, and Deadalus is requires-python
+# >=3.14 while Alpine 3.23 main ships 3.12 — hence the python3@edge pin in the
+# apk block above. Dropping that pin leaves this venv present but unrunnable.
+if [ -f /work/files/usr/local/share/deadalus/deadalus-podroid.tar ]; then
+    mkdir -p "$ROOTFS/opt/deadalus"
+    tar -xf /work/files/usr/local/share/deadalus/deadalus-podroid.tar -C "$ROOTFS"
+    chmod +x "$ROOTFS/opt/deadalus/start.sh" 2>/dev/null || true
     # override the tarball start.sh with the repo copy (per-install key gen,
     # no baked secret) + seed the LLM config template (empty api_key).
-    if [ -f /work/files/opt/hermes/start.sh ]; then
-        cp /work/files/opt/hermes/start.sh "$ROOTFS/opt/hermes/start.sh"
-        chmod +x "$ROOTFS/opt/hermes/start.sh"
+    if [ -f /work/files/opt/deadalus/start.sh ]; then
+        cp /work/files/opt/deadalus/start.sh "$ROOTFS/opt/deadalus/start.sh"
+        chmod +x "$ROOTFS/opt/deadalus/start.sh"
     fi
-    if [ -f /work/files/opt/hermes/config.template.yaml ]; then
-        cp /work/files/opt/hermes/config.template.yaml "$ROOTFS/opt/hermes/config.template.yaml"
+    if [ -f /work/files/opt/deadalus/config.template.yaml ]; then
+        cp /work/files/opt/deadalus/config.template.yaml "$ROOTFS/opt/deadalus/config.template.yaml"
     fi
     # seed the mazemaker MCP watcher alongside the venv (added on top of the tarball)
-    if [ -f /work/files/opt/hermes/mcp-mazemaker-watch.sh ]; then
-        cp /work/files/opt/hermes/mcp-mazemaker-watch.sh "$ROOTFS/opt/hermes/"
-        chmod +x "$ROOTFS/opt/hermes/mcp-mazemaker-watch.sh"
+    if [ -f /work/files/opt/deadalus/mcp-mazemaker-watch.sh ]; then
+        cp /work/files/opt/deadalus/mcp-mazemaker-watch.sh "$ROOTFS/opt/deadalus/"
+        chmod +x "$ROOTFS/opt/deadalus/mcp-mazemaker-watch.sh"
     fi
 fi
 
@@ -277,7 +292,7 @@ mkdir -p "$ROOTFS/etc/runlevels/default" "$ROOTFS/etc/runlevels/boot"
 # Guard each link: a dangling symlink (e.g. dnsmasq.lxcbr0, which lxc-bridge
 # may ship only as dnsmasq config and not an init script) makes OpenRC log
 # an error every boot and stalls podroid-ready's `after *` on a phantom.
-for svc in podroid-migrate podroid-bootstrap podroid-network podroid-resize dropbear docker lxc dnsmasq.lxcbr0 podroid-x11 podroid-vsock podroid-hostd podroid-ready iris-pod podroid-hermes podroid-hermes-mcp; do
+for svc in podroid-migrate podroid-bootstrap podroid-network podroid-resize dropbear docker lxc dnsmasq.lxcbr0 podroid-x11 podroid-vsock podroid-hostd podroid-ready iris-pod podroid-deadalus podroid-deadalus-mcp; do
     if [ -e "$ROOTFS/etc/init.d/$svc" ]; then
         ln -sf "/etc/init.d/$svc" "$ROOTFS/etc/runlevels/default/$svc"
     else

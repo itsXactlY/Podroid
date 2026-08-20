@@ -1,4 +1,4 @@
-# hermes LLM config — the OpenRouter upstream for the on-device pod.
+# deadalus LLM config — the OpenRouter upstream for the on-device pod.
 # Paste your OpenRouter API key below (sk-or-...) or via the mazemaker app's
 # Settings. NO KEY SHIPS IN THE IMAGE.
 model:
