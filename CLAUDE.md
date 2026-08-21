@@ -229,6 +229,33 @@ The guest system layer updates across app versions with **no VM reset and no dat
 - **Version anchor.** The squashfs ships `/etc/podroid/system-version` (baked from `versionCode` by `build-all.sh` -> `Dockerfile.rootfs` ARG -> `build-rootfs.sh`). The last-applied version persists at `/mnt/persist/.podroid/applied-version`.
 - **One-time legacy normalization.** `init-podroid` runs `podroid-overlay-normalize` (shipped in the squashfs, invoked via `/mnt/lower`, before the overlay is stacked) once per device (guarded by `/mnt/persist/.podroid/normalized`) to strip pre-existing `metacopy`/`redirect`/`index` state from uppers created by the old metacopy overlay. No-op on fresh/normalized uppers.
 - **Imperative hooks.** `podroid-migrate` (OpenRC, runs `before podroid-bootstrap`) executes `/etc/podroid/migrations/<v>.sh` for `applied < v <= system-version` in order, then advances `applied-version` atomically. **To ship a fixup in a new release** (e.g. enable a newly-added service): add `build-rootfs/files/etc/podroid/migrations/<versionCode>.sh`, idempotent, install it in `build-rootfs.sh`. Pure file additions/changes need NO script - the overlay union surfaces them.
+
+  **The install step was missing until versionCode 44.** `build-rootfs.sh` created `/etc/podroid/migrations` and copied its README, but never the `<v>.sh` files - they stayed on the build host. No migration had ever shipped, so nobody noticed that `podroid-migrate` always found an empty directory and every release silently skipped its own fixups. The build now logs `installed migration <v>.sh` per file; if that line is absent, the migration is not in the image.
+
+  Shipped so far:
+  - **43.sh** - carries the agent across the Deadalus -> Daedalus rename. The guest is one overlay (`lowerdir=/mnt/lower`, `upperdir=/mnt/persist/upper`), so swapping in a squashfs that has `/opt/daedalus` does **not** remove the `/opt/deadalus` that runtime writes left in the upper. What was at stake is the API key: `start.sh` mints a new `api_server.key` when `DAEDALUS_HOME` is empty, which would have silently invalidated the one already pasted into the app, with 401s from a healthy-looking pod as the only symptom.
+  - **44.sh** - installs an operator SSH key for root from `/etc/podroid/operator_key.pub`, when the build carries one.
+
+- **Getting a shell without the screen.** dropbear authenticates straight against `/etc/shadow`, so the root password used to be the only way in - and the console fallback needs the phone unlocked with its display held open, which is not an option on a burned-in panel. Every other route into the guest goes through that shell, so one forgotten password takes the whole VM with it.
+
+  `build-rootfs/files/etc/podroid/operator_key.pub` fixes that: gitignored, copied into the image only when present, and installed into `/root/.ssh/authorized_keys` by migration 44 at boot **as root, needing no credential**. A public build has no such file and the migration no-ops - embedding a key would put one operator's public key into every install, and whoever held the matching private key would have root on every device that ever shipped this rootfs.
+
+  ```bash
+  # SSH port is published on the phone's LAN address, no adb needed
+  ssh -i ~/.ssh/id_ed25519 -p 9922 root@<phone-ip>
+
+  # or over adb when the phone is not on the LAN
+  adb forward tcp:9922 tcp:9922 && ssh -i ~/.ssh/id_ed25519 -p 9922 root@127.0.0.1
+  ```
+
+  `scp` does **not** work - dropbear ships no sftp-server. Pipe instead:
+  `tar -cf - dir | ssh ... 'cd /dest && tar -xf -'`.
+
+  A fresh rootfs regenerates dropbear's host key, so the first connection after a
+  reflash trips `REMOTE HOST IDENTIFICATION HAS CHANGED`. That is expected, not a
+  MITM: `ssh-keygen -R '[127.0.0.1]:9922'` (or the phone's IP) and reconnect.
+
+- **The VM does not start itself.** `PodroidService` is `android:exported="false"` and there is no `BOOT_COMPLETED` receiver, so nothing outside the app can start the guest - `adb shell am start-foreground-service` is refused, and `adb install -r` does not restart a running VM either. Booting the guest currently requires one tap on **Start VM**. Worth knowing before planning any screen-free recovery: everything *after* that tap can be driven over SSH.
 - **Reliability:** the marker advances only after migration completes (crash -> idempotent re-run); nothing auto-wipes `/mnt/persist`; `init-podroid` keeps its `FATAL -> exec sh` recovery shell.
 
 ## Common tasks
