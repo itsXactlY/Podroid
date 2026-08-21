@@ -80,3 +80,4 @@ app/src/main/jniLibs/
 # 100s of MB; never commit). build-all.sh / build-podman-image.sh produce these.
 /_staging-iris-tars/
 /build-rootfs/files/usr/local/share/
+/build-rootfs/files/etc/podroid/operator_key.pub

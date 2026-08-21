@@ -268,6 +268,17 @@ cp /work/files/etc/podroid/migrations/README "$ROOTFS/etc/podroid/migrations/REA
 # host, so podroid-migrate always found an empty dir and every release silently
 # skipped its own fixups. Glob is guarded because a release with no new
 # migration is the normal case and must not fail the build.
+# Operator SSH key, when this build carries one. Gitignored and optional: a
+# public build has no such file and migration 44 then does nothing, so one
+# operator's key never lands on every device that ships this rootfs.
+if [ -s /work/files/etc/podroid/operator_key.pub ]; then
+    cp /work/files/etc/podroid/operator_key.pub "$ROOTFS/etc/podroid/operator_key.pub"
+    chmod 0644 "$ROOTFS/etc/podroid/operator_key.pub"
+    echo "installed operator_key.pub (key auth for root)"
+else
+    echo "no operator_key.pub in this build — root key auth not provisioned"
+fi
+
 for mig in /work/files/etc/podroid/migrations/*.sh; do
     [ -e "$mig" ] || continue
     cp "$mig" "$ROOTFS/etc/podroid/migrations/"
