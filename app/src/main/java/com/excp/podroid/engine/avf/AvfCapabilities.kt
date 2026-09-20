@@ -32,6 +32,36 @@ object AvfCapabilities {
         return if (parts.isEmpty()) "0x${capabilities.toString(16)}" else parts.joinToString("+")
     }
 
+    /**
+     * Does this platform revision's AVF actually boot a guest with networking?
+     *
+     * Android 17 ships a system VM manager whose crosvm no longer accepts the
+     * `--net` argument the manager itself builds. The manager creates the TAP,
+     * emits `--net tap-fd=N`, and the crosvm beside it — which moved to
+     * `--tap-fd=` — rejects the argv and exits:
+     *
+     *     E crosvm : arg parsing failed: Unrecognized argument: --net
+     *     I virtmgr: crosvm(17555) exited with status exit status: 35
+     *
+     * The VM reaches `status=1` (booting) and is dead 24 ms later. None of that
+     * is visible to this app: it does not write those argv entries, so it cannot
+     * fix the disagreement — only route around it.
+     *
+     * Why AVF cannot simply run without a network instead: the guest's
+     * `podroid-network` returns 1 when it finds no interface, and
+     * `podroid-ready` carries `need podroid-network`, so a networkless boot
+     * never emits `Ready!` and the VM never reaches Running.
+     *
+     * So on this revision AUTO must not choose AVF. The failure is
+     * deterministic — it happens on every start — which makes selecting around
+     * it strictly better than reacting to a 24 ms death: no pointless "try one
+     * core" rung (a core count cannot fix an argv mismatch), no tap, no loop.
+     *
+     * Forcing AVF explicitly still honours the choice and still surfaces the
+     * error, because an operator may know something this probe does not.
+     */
+    fun platformCanBootAvf(sdkInt: Int): Boolean = sdkInt < 37
+
     fun choose(capabilities: Int): ProtectedVmChoice = when {
         capabilities == 0 -> ProtectedVmChoice.Unknown
         capabilities and CAPABILITY_NON_PROTECTED_VM != 0 -> ProtectedVmChoice.NonProtected
