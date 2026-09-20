@@ -217,6 +217,19 @@ class EngineHolder @Inject constructor(
         // networking, so each start dies at argv parse. Presence is not
         // viability, and a probe that only checks presence picks a backend that
         // cannot run.
+        // Dump the AVF builder's API surface once per process, HERE rather than
+        // in AvfEngine: when AVF is not selected, AvfEngine never constructs a
+        // config, so a dump placed there never runs on exactly the devices whose
+        // API surface we most need to see. This runs on every start, whichever
+        // backend wins.
+        runCatching {
+            val b = com.excp.podroid.engine.avf.AvfReflect.newVmConfigBuilder(context)
+            val names = b.javaClass.declaredMethods.map { it.name }
+                .filter { it.startsWith("set") || it.startsWith("use") || it.startsWith("add") }
+                .distinct().sorted()
+            android.util.Log.i(TAG, "AVF builder API: $names")
+        }
+
         val platformCanBoot = AvfCapabilities.platformCanBootAvf(android.os.Build.VERSION.SDK_INT)
         if (!platformCanBoot) {
             android.util.Log.w(

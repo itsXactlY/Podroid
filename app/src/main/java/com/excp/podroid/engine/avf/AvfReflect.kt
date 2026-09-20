@@ -63,9 +63,31 @@ object AvfReflect {
         runCatching { invokeDecl(mgr, "delete", String::class.java to name) }
     }
 
-    fun newVmConfigBuilder(ctx: Context): Any =
-        CFG_B.getDeclaredConstructor(Context::class.java).apply { isAccessible = true }
+    /** Logged once per process; the builder's API surface is fixed at runtime. */
+    @Volatile private var builderAPIReported = false
+
+    fun newVmConfigBuilder(ctx: Context): Any {
+        val b = CFG_B.getDeclaredConstructor(Context::class.java).apply { isAccessible = true }
             .newInstance(ctx)
+        if (!builderAPIReported) {
+            builderAPIReported = true
+            // The ground truth about what this revision offers, straight from
+            // the device. Reflection here is guesswork against a moving target —
+            // `--net` vs `--tap-fd=`, ctor shapes that gained and lost an
+            // appDomain parameter — and the only authority is the class the
+            // phone actually loaded. Dumping it once costs a log line and ends
+            // the guessing.
+            runCatching {
+                val names = b.javaClass.declaredMethods
+                    .map { it.name }
+                    .filter { it.startsWith("set") || it.startsWith("use") || it.startsWith("add") }
+                    .distinct()
+                    .sorted()
+                android.util.Log.i("AvfReflect", "builder API (${b.javaClass.name}): $names")
+            }
+        }
+        return b
+    }
 
     fun setProtectedVm(b: Any, value: Boolean) {
         invokeDecl(b, "setProtectedVm", Boolean::class.javaPrimitiveType!! to value)
