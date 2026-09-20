@@ -133,18 +133,11 @@ class HomeViewModel @Inject constructor(
         .map { it is VmState.Error && engine.backendId == "avf" }
         .stateIn(viewModelScope, SharingStarted.Eagerly, false)
 
-    /**
-     * Advice for the failure surface, based on the current vCPU setting AND the
-     * platform. The sdk is part of the decision because on some revisions the
-     * one-core rung cannot help at all — see AvfFailureGuidance.
-     */
+    /** Advice for the failure surface, from the current vCPU setting — see
+     *  AvfFailureGuidance. */
     val avfFailureAdvice: StateFlow<com.excp.podroid.engine.avf.AvfFailureGuidance.Advice> =
         settingsRepository.vmCpus
-            .map {
-                com.excp.podroid.engine.avf.AvfFailureGuidance.advise(
-                    it, android.os.Build.VERSION.SDK_INT
-                )
-            }
+            .map { com.excp.podroid.engine.avf.AvfFailureGuidance.advise(it) }
             .stateIn(
                 viewModelScope, SharingStarted.Eagerly,
                 com.excp.podroid.engine.avf.AvfFailureGuidance.Advice.SWITCH_TO_QEMU,

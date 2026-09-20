@@ -73,10 +73,10 @@ object AvfReflect {
             builderAPIReported = true
             // The ground truth about what this revision offers, straight from
             // the device. Reflection here is guesswork against a moving target —
-            // `--net` vs `--tap-fd=`, ctor shapes that gained and lost an
-            // appDomain parameter — and the only authority is the class the
-            // phone actually loaded. Dumping it once costs a log line and ends
-            // the guessing.
+            // networking setters that exist on one revision and are gone on the
+            // next, ctor shapes that gained and lost an appDomain parameter —
+            // and the only authority is the class the phone actually loaded.
+            // Dumping it once costs a log line and ends the guessing.
             runCatching {
                 val names = b.javaClass.declaredMethods
                     .map { it.name }
@@ -177,15 +177,31 @@ object AvfReflect {
     /** Count the proxy applies at the next createVm (set per launch attempt). */
     @Volatile private var pendingCpuCount = 0
 
-    private val explicitCpuCountProbe: Boolean by lazy {
+    /**
+     * The reflective handles the createVm rewrite needs: the AIDL interface,
+     * the raw config, and the two fields leading from VirtualMachine to the
+     * live binder.
+     */
+    private val rawConfigRewriteProbe: Boolean by lazy {
         runCatching {
+            Class.forName("$VS_PKG.IVirtualizationService")
+            Class.forName("$VS_PKG.VirtualMachineRawConfig")
+            Class.forName("$PKG.VirtualMachine").getDeclaredField("mVirtualizationService")
+            Class.forName("$PKG.VirtualizationService").getDeclaredField("mBinder")
+            true
+        }.getOrElse {
+            android.util.Log.i("AvfReflect",
+                "raw-config rewrite unavailable on this AVF revision: ${it.message}")
+            false
+        }
+    }
+
+    private val explicitCpuCountProbe: Boolean by lazy {
+        rawConfigRewriteProbe && runCatching {
             Class.forName("$VS_PKG.CpuOptions\$CpuTopology")
                 .getDeclaredMethod("cpuCount", Int::class.javaPrimitiveType)
             Class.forName("$VS_PKG.CpuOptions").getDeclaredField("cpuTopology")
             Class.forName("$VS_PKG.VirtualMachineRawConfig").getDeclaredField("cpuOptions")
-            Class.forName("$VS_PKG.IVirtualizationService")
-            Class.forName("$PKG.VirtualMachine").getDeclaredField("mVirtualizationService")
-            Class.forName("$PKG.VirtualizationService").getDeclaredField("mBinder")
             true
         }.getOrElse {
             android.util.Log.i("AvfReflect",
@@ -211,31 +227,8 @@ object AvfReflect {
     fun installExplicitCpuCount(vm: Any, n: Int): Boolean {
         if (!supportsExplicitCpuCount() || n < 1) return false
         return runCatching {
-            val vsField = Class.forName("$PKG.VirtualMachine")
-                .getDeclaredField("mVirtualizationService").apply { isAccessible = true }
-            val vs = vsField.get(vm) ?: error("mVirtualizationService is null")
-            val binderField = Class.forName("$PKG.VirtualizationService")
-                .getDeclaredField("mBinder").apply { isAccessible = true }
-            val real = binderField.get(vs) ?: error("mBinder is null")
+            installRawConfigProxy(vm)
             pendingCpuCount = n
-            // A fresh VirtualizationService carries the raw AIDL stub; if this
-            // one already holds our proxy (same instance is cached per process),
-            // updating pendingCpuCount above is all that's needed.
-            if (!Proxy.isProxyClass(real.javaClass)) {
-                val ivs = Class.forName("$VS_PKG.IVirtualizationService")
-                val proxy = Proxy.newProxyInstance(ivs.classLoader, arrayOf(ivs)) { _, method, args ->
-                    if (method.name == "createVm") rewriteCpuOptions(args?.getOrNull(0))
-                    try {
-                        if (args == null) method.invoke(real) else method.invoke(real, *args)
-                    } catch (e: java.lang.reflect.InvocationTargetException) {
-                        // Re-throw the binder's real exception (e.g.
-                        // ServiceSpecificException) so run()'s catches see the
-                        // original type, not our reflective wrapper.
-                        throw e.cause ?: e
-                    }
-                }
-                binderField.set(vs, proxy)
-            }
             android.util.Log.i("AvfReflect", "explicit vCPU hook armed: cpuCount=$n")
             true
         }.getOrElse {
@@ -244,6 +237,35 @@ object AvfReflect {
                 "explicit vCPU hook install failed; falling back to nr_cpus ladder", it)
             false
         }
+    }
+
+    /**
+     * Puts a Proxy in front of the process-shared IVirtualizationService binder
+     * so createVm can rewrite the raw config in flight. Idempotent: the
+     * VirtualizationService instance is cached per process, so a later call
+     * finds the proxy already installed and only re-arms the flags above.
+     */
+    private fun installRawConfigProxy(vm: Any) {
+        val vsField = Class.forName("$PKG.VirtualMachine")
+            .getDeclaredField("mVirtualizationService").apply { isAccessible = true }
+        val vs = vsField.get(vm) ?: error("mVirtualizationService is null")
+        val binderField = Class.forName("$PKG.VirtualizationService")
+            .getDeclaredField("mBinder").apply { isAccessible = true }
+        val real = binderField.get(vs) ?: error("mBinder is null")
+        if (Proxy.isProxyClass(real.javaClass)) return
+        val ivs = Class.forName("$VS_PKG.IVirtualizationService")
+        val proxy = Proxy.newProxyInstance(ivs.classLoader, arrayOf(ivs)) { _, method, args ->
+            if (method.name == "createVm") rewriteCpuOptions(args?.getOrNull(0))
+            try {
+                if (args == null) method.invoke(real) else method.invoke(real, *args)
+            } catch (e: java.lang.reflect.InvocationTargetException) {
+                // Re-throw the binder's real exception (e.g.
+                // ServiceSpecificException) so run()'s catches see the
+                // original type, not our reflective wrapper.
+                throw e.cause ?: e
+            }
+        }
+        binderField.set(vs, proxy)
     }
 
     /**
@@ -315,6 +337,44 @@ object AvfReflect {
         runCatching {
             invokeDecl(b, "setVmConsoleInputSupported", Boolean::class.javaPrimitiveType!! to value)
         }
+    }
+
+    /**
+     * Asks the custom-image config for a virtio-sound device.
+     *
+     * Podroid is headless and has no use for audio: this is a workaround, and it
+     * is load-bearing. For a custom-image VM that needs no vhost-user device,
+     * the platform launches a reduced crosvm whose build omits the `net` cargo
+     * feature. `--net` then is not an argument it knows, and since virtmgr emits
+     * `--net` whenever the config asks for networking, the guest dies with
+     *
+     *     arg parsing failed: Unrecognized argument: --net
+     *     crosvm(23406) exited with status exit status: 35
+     *
+     * ~24 ms after reaching `status=1` — before `vm list` ever shows it.
+     * Requiring a vhost-user device (the sound card) puts the VM on the full
+     * crosvm, which does have `net`, and the identical `--net tap-fd=N` parses.
+     *
+     * Verified on a Pixel 7 Pro / Android 17 (CP3A.260905.009): without it, dead
+     * on arrival; with it, the guest boots to `Ready!` with a DHCP lease and the
+     * app shows Running.
+     *
+     * The platform's own Terminal VM is the tell — the one VM on this device
+     * whose crosvm accepts `--net tap-fd=55` also carries `--vhost-user sound`
+     * and a GPU. AOSP upstream has a single hardcoded crosvm path and no
+     * selection logic at all, so the split comes from Google's internal
+     * com.google.android.virt build; there is nothing upstream to fix.
+     */
+    fun setAudioConfig(b: Any, useInput: Boolean, useOutput: Boolean): Boolean = runCatching {
+        val cls = Class.forName("$PKG.VirtualMachineCustomImageConfig\$AudioConfig")
+        val cfg = cls.getDeclaredConstructor(
+            Boolean::class.javaPrimitiveType, Boolean::class.javaPrimitiveType
+        ).apply { isAccessible = true }.newInstance(useInput, useOutput)
+        invokeDecl(b, "setAudioConfig", cls to cfg)
+        true
+    }.getOrElse {
+        android.util.Log.w("AvfReflect", "setAudioConfig unavailable on this revision: ${it.message}")
+        false
     }
 
     fun setCustomImageConfig(b: Any, cfg: Any) {
@@ -478,10 +538,39 @@ object AvfReflect {
         return null
     }
 
+    /**
+     * Asks the config builder for a guest network interface.
+     *
+     * On Android 17 only the CUSTOM-image builder answers: it has `useNetwork`,
+     * while the outer VirtualMachineConfig.Builder has no network method at all.
+     * Being answered is not the same as being usable here — virtmgr turns the
+     * flag into crosvm's `--net tap-fd=N`, and the crosvm it launches for a
+     * custom-image VM rejects that argument:
+     *
+     *     arg parsing failed: Unrecognized argument: --net
+     *     crosvm(23406) exited with status exit status: 35
+     *
+     * killing the guest ~24 ms after it reaches `status=1`. Measured on a Pixel
+     * 7 Pro / Android 17 (CP3A.260905.009) with the platform's own Terminal VM
+     * running beside it on `--net tap-fd=55`, so the platform can do this for
+     * some VM profiles and not for Podroid's.
+     *
+     * With [value] false the VM boots and stays up (verified: alive for
+     * minutes), but the guest has no interface — and Podroid's `podroid-network`
+     * returns 1 without one, so `podroid-ready`, which carries
+     * `need podroid-network`, never fires. Neither setting yields a guest that
+     * reaches Ready on this revision.
+     *
+     * The platform flag that would move virtmgr to the newer vhost-user form,
+     * `com.android.system.virtualmachine.flags.vhost_user_network`, is false and
+     * read-only on this build (neither `device_config put` nor the aconfig
+     * property override is permitted), so nothing in this app can turn it on.
+     */
     fun setNetworkSupported(b: Any, value: Boolean) {
         val ok = runCatching { invokeDecl(b, "useNetwork", Boolean::class.javaPrimitiveType!! to value) }.isSuccess
             || runCatching { invokeDecl(b, "setNetworkSupported", Boolean::class.javaPrimitiveType!! to value) }.isSuccess
-        if (!ok) android.util.Log.w("AvfReflect", "no useNetwork/setNetworkSupported on this AVF API; VM may have no network")
+        if (!ok) android.util.Log.i("AvfReflect",
+            "builder has no useNetwork/setNetworkSupported on this AVF revision")
     }
 
     /**

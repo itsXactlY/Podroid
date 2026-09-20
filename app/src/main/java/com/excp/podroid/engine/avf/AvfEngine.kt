@@ -1012,6 +1012,21 @@ class AvfEngine @Inject constructor(
                 Log.i(TAG, "downloads share NOT added — Settings toggle is a no-op on this AVF revision")
             }
         }
+        // Requested even though this revision cannot honour it (see
+        // AvfReflect.setNetworkSupported): the platform's rejection is immediate
+        // and names itself — crosvm exits 35 on `--net` — whereas omitting the
+        // request buys a VM that boots and then hangs forever at
+        // `podroid-network`, which is the harder failure to read. The
+        // engine-selection gate keeps AUTO off this path either way.
+        // The virtual sound card is load-bearing, not a feature — Podroid is
+        // headless. It is what keeps the platform from handing this VM a crosvm
+        // built without `net`, which would reject the `--net` the next line
+        // causes. See AvfReflect.setAudioConfig.
+        if (!AvfReflect.setAudioConfig(cb, useInput = true, useOutput = true)) {
+            Log.w(TAG, "no virtual sound card on this AVF revision; if its VM manager " +
+                "withholds the net-capable crosvm from bare custom-image VMs, the network " +
+                "request below will kill this guest with crosvm exit 35")
+        }
         AvfReflect.setNetworkSupported(cb, true)
         val customCfg = AvfReflect.build(cb)
 

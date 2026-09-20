@@ -212,11 +212,18 @@ class EngineHolder @Inject constructor(
         // conjuncts are true (feature+perms+reachable, caps=NonProtected), so
         // this is unchanged for the happy path.
         // Every other conjunct here asks "is AVF present and permitted?". This
-        // one asks "will it actually boot?", which on Android 17 it will not:
-        // the platform's VM manager and its own crosvm disagree about guest
-        // networking, so each start dies at argv parse. Presence is not
-        // viability, and a probe that only checks presence picks a backend that
-        // cannot run.
+        // one asks "can its guest get a network interface?", because without a
+        // NIC the guest's `podroid-network` returns 1 and `podroid-ready` —
+        // which carries `need podroid-network` — never fires, so the VM stops
+        // short of Ready and reads as a hung boot.
+        //
+        // The question is put to the runtime reflective handles rather than
+        // guessed from the SDK level. An SDK check lived here before
+        // (`sdkInt < 37`) and it disabled AVF on every Android 17 device on the
+        // strength of one phone's log — including this one, which runs Google's
+        // own Terminal VM on Android 17 with `--net tap-fd=55` in its argv.
+        // Presence is not viability, but neither is a version number.
+        //
         // Dump the AVF builder's API surface once per process, HERE rather than
         // in AvfEngine: when AVF is not selected, AvfEngine never constructs a
         // config, so a dump placed there never runs on exactly the devices whose
@@ -230,21 +237,11 @@ class EngineHolder @Inject constructor(
             android.util.Log.i(TAG, "AVF builder API: $names")
         }
 
-        val platformCanBoot = AvfCapabilities.platformCanBootAvf(android.os.Build.VERSION.SDK_INT)
-        if (!platformCanBoot) {
-            android.util.Log.w(
-                TAG,
-                "AVF unusable on this platform (SDK ${android.os.Build.VERSION.SDK_INT}): the " +
-                    "system VM manager builds crosvm's argv with --net, which the crosvm it " +
-                    "ships rejects (--tap-fd=). Selecting QEMU."
-            )
-        }
         val avfUsable = probe.featureSupported &&
             probe.managePermissionGranted &&
             probe.customPermissionGranted &&
             probe.serviceReachable &&
             probe.customVmConfigSupported &&
-            platformCanBoot &&
             capsChoice !is AvfCapabilities.ProtectedVmChoice.Unsupported
         return when {
             sel == EngineSelection.QEMU -> qemuProvider.get()

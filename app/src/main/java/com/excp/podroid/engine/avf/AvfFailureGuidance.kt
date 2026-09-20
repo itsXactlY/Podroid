@@ -14,17 +14,7 @@ object AvfFailureGuidance {
     enum class Advice { TRY_ONE_CORE, SWITCH_TO_QEMU }
 
     /** cpus > 1 -> the MATCH_HOST topology may be the cause; suggest one core
-     *  first. cpus == 1 -> one core already failed, AVF can't run here.
-     *
-     *  On a platform whose AVF cannot boot at all (see
-     *  AvfCapabilities.platformCanBootAvf) the one-core rung is not a smaller
-     *  guess, it is a wrong one: the failure is the platform's VM manager and
-     *  crosvm disagreeing about a command-line argument, which no core count
-     *  touches. Sending somebody to try one core there costs a boot, a wait,
-     *  and the same error — so go straight to the thing that works. */
-    fun advise(cpus: Int, sdkInt: Int): Advice = when {
-        !AvfCapabilities.platformCanBootAvf(sdkInt) -> Advice.SWITCH_TO_QEMU
-        cpus > 1 -> Advice.TRY_ONE_CORE
-        else -> Advice.SWITCH_TO_QEMU
-    }
+     *  first. cpus == 1 -> one core already failed, AVF can't run here. */
+    fun advise(cpus: Int): Advice =
+        if (cpus > 1) Advice.TRY_ONE_CORE else Advice.SWITCH_TO_QEMU
 }
