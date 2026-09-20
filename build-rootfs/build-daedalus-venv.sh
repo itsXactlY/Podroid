@@ -13,8 +13,9 @@
 #       opt/daedalus/start.sh            launcher, execs `daedalus gateway run`
 #       opt/daedalus/config.template.yaml
 #
-# Paths are stored relative to /, matching hermes-podroid.tar, so build-rootfs
-# extracts it straight into $ROOTFS.
+# Paths are stored relative to /, so build-rootfs extracts it straight into
+# $ROOTFS. (This said "matching hermes-podroid.tar" — that tarball staged 183 MB
+# nothing referenced and no longer exists, so the comparison pointed at nothing.)
 #
 # PYTHON 3.14, AND WHY IT COMES FROM edge
 #   Daedalus is requires-python >=3.14. Alpine 3.23 main ships python3 3.12.14,
@@ -106,6 +107,23 @@ test -x /opt/daedalus/venv/bin/daedalus || { echo "FATAL: no daedalus entrypoint
     || { echo "FATAL: daedalus gateway --help failed" >&2; exit 1; }
 
 mkdir -p /opt/daedalus/daedalus-agent-data
+
+# Skills are NOT Python package data and never reach the wheel: they are
+# SKILL.md files under a top-level skills/ directory, while package-data only
+# collects plugin.yaml/*.yaml/*.yml inside packages. So a pip-installed agent
+# has the code and none of the 100 curated skills — the pod came up reporting
+# "No skills installed" while the repo carried all of them.
+#
+# Copy them into the agent HOME, which is where Daedalus looks at runtime
+# (DAEDALUS_HOME/skills), rather than into site-packages.
+if [ -d /build/skills ]; then
+    mkdir -p /opt/daedalus/daedalus-agent-data/skills
+    cp -a /build/skills/. /opt/daedalus/daedalus-agent-data/skills/
+    echo "[guest] skills: $(find /opt/daedalus/daedalus-agent-data/skills -name SKILL.md | wc -l) SKILL.md"
+else
+    echo "[guest] WARNING: no skills/ in source export" >&2
+fi
+
 tar -cf /out/daedalus-podroid.tar -C / opt/daedalus
 ' || die "venv build failed"
 
