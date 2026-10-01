@@ -34,6 +34,8 @@ android {
         applicationId = "com.excp.podroid"
         minSdk = 26
         targetSdk = 36
+        // 48 / 1.4.5: the in-app updater is gone — The Box (dev.mazemaker.thebox)
+        // is the family's only updater. No REQUEST_INSTALL_PACKAGES any more.
         // 47 / 1.4.4: vendored image bumped to gateway.py 785d34f — a peer that
         // re-keys (reset, reinstall, simultaneous first-contact) is followed
         // instead of being dropped forever; parallel Tor outbox + replay-guard
@@ -47,16 +49,9 @@ android {
         // versionCode would have shipped a materially different app under a
         // number identical to the one already installed — invisible to the
         // in-app updater, and indistinguishable from "nothing happened".
-        versionCode = 47
-        versionName = "1.4.4"
+        versionCode = 48
+        versionName = "1.4.5"
         buildConfigField("String", "QEMU_VERSION", "\"$podroidQemuVersion\"")
-        // Self-hosted update manifest (see jackbox/build-box.sh + publish-thebox.sh
-        // in mazemaker-mobile). NOT GitHub: itsXactlY/Iris-Messenger is a PRIVATE
-        // repo, so an unauthenticated api.github.com/repos/.../releases/latest call
-        // always 404s (GitHub hides private repos from anonymous requests) — the
-        // in-app updater silently never worked. This manifest is served straight
-        // off mazemaker-prod, no auth needed, no GitHub rate limits to worry about.
-        buildConfigField("String", "UPDATE_MANIFEST_URL", "\"https://iris.mazemaker.online/thebox/manifest.json\"")
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 

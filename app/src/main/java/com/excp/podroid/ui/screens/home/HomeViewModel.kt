@@ -6,8 +6,6 @@ import androidx.lifecycle.viewModelScope
 import com.excp.podroid.BuildConfig
 import com.excp.podroid.data.repository.PortForwardRepository
 import com.excp.podroid.data.repository.SettingsRepository
-import com.excp.podroid.data.repository.UpdateInfo
-import com.excp.podroid.data.repository.UpdateRepository
 import com.excp.podroid.engine.VmEngine
 import com.excp.podroid.engine.VmState
 import com.excp.podroid.service.PodroidService
@@ -56,7 +54,6 @@ class HomeViewModel @Inject constructor(
     private val engine: VmEngine,
     private val settingsRepository: SettingsRepository,
     private val portForwardRepository: PortForwardRepository,
-    private val updateRepository: UpdateRepository,
 ) : ViewModel() {
 
     val vmState: StateFlow<VmState> = engine.state
@@ -106,9 +103,6 @@ class HomeViewModel @Inject constructor(
 
     /** Phone IPv4 — cheap, lazily recomputed when the screen reads it. */
     fun phoneIp(): String = NetworkUtils.localIpv4(context)
-
-    private val _updateInfo = MutableStateFlow<UpdateInfo?>(null)
-    val updateInfo: StateFlow<UpdateInfo?> = _updateInfo.asStateFlow()
 
     /**
      * True when AVF (pKVM) is present on this device but neither
@@ -168,7 +162,6 @@ class HomeViewModel @Inject constructor(
         get() = engine.runningSinceMs ?: fallbackRunningSinceMs
 
     init {
-        checkForUpdate()
         // Maintain fallbackRunningSinceMs for engines that don't override runningSinceMs.
         viewModelScope.launch {
             var lastWasRunning = false
@@ -196,120 +189,6 @@ class HomeViewModel @Inject constructor(
             minutes > 0 -> "Up ${minutes}m ${seconds}s"
             else        -> "Up ${seconds}s"
         }
-    }
-
-    private val _checkingForUpdate = MutableStateFlow(false)
-    val checkingForUpdate: StateFlow<Boolean> = _checkingForUpdate.asStateFlow()
-
-    /** One-shot signal for the manual check: true if the just-completed check
-     *  found nothing new, so the UI can show a brief "up to date" confirmation
-     *  instead of leaving the user wondering whether the tap did anything.
-     *  Cleared by the UI via [clearUpToDateSignal] after it's shown once. */
-    private val _upToDateSignal = MutableStateFlow(false)
-    val upToDateSignal: StateFlow<Boolean> = _upToDateSignal.asStateFlow()
-
-    private fun checkForUpdate() = doCheckForUpdate(force = false)
-
-    /** User-initiated check from Settings — bypasses the 24h cache gate.
-     *  Automatic checks only run once per HomeViewModel lifetime (init{}) plus
-     *  on-resume; this is the only way to force a check without restarting the
-     *  app or waiting out the cache. */
-    fun checkForUpdateNow() = doCheckForUpdate(force = true)
-
-    private fun doCheckForUpdate(force: Boolean) {
-        viewModelScope.launch {
-            if (force) _checkingForUpdate.value = true
-            try {
-                val info = updateRepository.checkForUpdate(BuildConfig.VERSION_NAME, force = force)
-                if (info == null) {
-                    if (force) _upToDateSignal.value = true
-                    return@launch
-                }
-                if (force || !updateRepository.isDismissed(info.latestVersion)) {
-                    _updateInfo.value = info
-                }
-            } catch (c: kotlinx.coroutines.CancellationException) {
-                throw c
-            } catch (e: Exception) {
-                android.util.Log.w("HomeViewModel", "update check failed", e)
-            } finally {
-                if (force) _checkingForUpdate.value = false
-            }
-        }
-    }
-
-    /** Called by the UI once it has shown the "up to date" confirmation. */
-    fun clearUpToDateSignal() {
-        _upToDateSignal.value = false
-    }
-
-    /** Re-check on every return to Home (e.g. backgrounded overnight, or the
-     *  manifest changed since last cold start) — still gated by the normal
-     *  24h cache unless the user taps "Check for updates" in Settings. */
-    fun onResume() = checkForUpdate()
-
-    fun dismissUpdate() {
-        val version = _updateInfo.value?.latestVersion ?: return
-        _updateInfo.value = null
-        _updateAction.value = UpdateAction.Idle
-        viewModelScope.launch { updateRepository.dismissUpdate(version) }
-    }
-
-    /** Progress/branch state for the in-app "Download & Install" flow. */
-    sealed interface UpdateAction {
-        data object Idle : UpdateAction
-        data class Downloading(val progress: Float) : UpdateAction
-        /** OS blocks installs from this app until the user grants "install unknown apps". */
-        data object NeedsInstallPermission : UpdateAction
-        data object Failed : UpdateAction
-    }
-
-    private val _updateAction = MutableStateFlow<UpdateAction>(UpdateAction.Idle)
-    val updateAction: StateFlow<UpdateAction> = _updateAction.asStateFlow()
-
-    /**
-     * Download the release APK (with progress) and hand it to the system
-     * installer. If the OS hasn't granted "install unknown apps" to this app,
-     * surfaces [UpdateAction.NeedsInstallPermission] so the UI can route to
-     * settings instead.
-     */
-    fun downloadAndInstallUpdate() {
-        val info = _updateInfo.value ?: return
-        if (info.apkUrl == null) return // UI falls back to opening the release page
-        if (!updateRepository.canInstallPackages()) {
-            _updateAction.value = UpdateAction.NeedsInstallPermission
-            return
-        }
-        viewModelScope.launch {
-            _updateAction.value = UpdateAction.Downloading(0f)
-            try {
-                val file = updateRepository.downloadApk(info) { p ->
-                    _updateAction.value = UpdateAction.Downloading(p)
-                }
-                if (file == null) {
-                    _updateAction.value = UpdateAction.Failed
-                    return@launch
-                }
-                val launched = updateRepository.installApk(file)
-                _updateAction.value = if (launched) UpdateAction.Idle else UpdateAction.Failed
-            } catch (c: kotlinx.coroutines.CancellationException) {
-                _updateAction.value = UpdateAction.Idle
-                throw c
-            } catch (e: Exception) {
-                android.util.Log.w("HomeViewModel", "download/install failed", e)
-                _updateAction.value = UpdateAction.Failed
-            }
-        }
-    }
-
-    /** Send the user to grant "install unknown apps" for this app, then reset. */
-    fun openInstallPermissionSettings() {
-        runCatching { context.startActivity(updateRepository.unknownSourcesSettingsIntent()) }
-        _updateAction.value = UpdateAction.Idle
-    }
-
-    fun resetUpdateAction() {
-        _updateAction.value = UpdateAction.Idle
     }
 
     fun dismissAvfHint() {

@@ -71,7 +71,6 @@ fun HomeScreen(
     val context = LocalContext.current
     val vmState by viewModel.vmState.collectAsStateWithLifecycle()
     val bootStage by viewModel.bootStage.collectAsStateWithLifecycle()
-    val updateInfo by viewModel.updateInfo.collectAsStateWithLifecycle()
     val meta by viewModel.meta.collectAsStateWithLifecycle()
     val uptimeTick by viewModel.uptimeTicker.collectAsStateWithLifecycle()
     val showAvfHint by viewModel.showAvfHint.collectAsStateWithLifecycle()
@@ -91,111 +90,10 @@ fun HomeScreen(
         val observer = LifecycleEventObserver { _, event ->
             if (event == Lifecycle.Event.ON_RESUME) {
                 phoneIp = viewModel.phoneIp()
-                viewModel.onResume()
             }
         }
         lifecycleOwner.lifecycle.addObserver(observer)
         onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
-    }
-
-    val checkingForUpdate by viewModel.checkingForUpdate.collectAsStateWithLifecycle()
-    val upToDateSignal by viewModel.upToDateSignal.collectAsStateWithLifecycle()
-    val upToDateMessage = stringResource(R.string.update_up_to_date)
-    androidx.compose.runtime.LaunchedEffect(upToDateSignal) {
-        if (upToDateSignal) {
-            android.widget.Toast.makeText(context, upToDateMessage, android.widget.Toast.LENGTH_SHORT).show()
-            viewModel.clearUpToDateSignal()
-        }
-    }
-
-    updateInfo?.let { info ->
-        val updateAction by viewModel.updateAction.collectAsStateWithLifecycle()
-        val downloading = updateAction as? HomeViewModel.UpdateAction.Downloading
-        val hasApk = info.apkUrl != null
-
-        // Open the release page in a browser — the fallback when a release has no
-        // APK asset, or when the user prefers the manual route.
-        val openReleasePage = {
-            runCatching {
-                context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(info.releaseUrl)))
-            }.onFailure {
-                android.widget.Toast.makeText(
-                    context,
-                    context.getString(R.string.update_open_failed),
-                    android.widget.Toast.LENGTH_LONG,
-                ).show()
-            }
-            Unit
-        }
-
-        AlertDialog(
-            // Don't let an outside tap cancel a download in flight.
-            onDismissRequest = { if (downloading == null) viewModel.dismissUpdate() },
-            icon  = { Icon(Icons.Default.SystemUpdate, contentDescription = null) },
-            title = { Text(stringResource(R.string.update_available)) },
-            text  = {
-                Column {
-                    Text(stringResource(R.string.version_available, info.latestVersion, BuildConfig.VERSION_NAME))
-                    when (val a = updateAction) {
-                        is HomeViewModel.UpdateAction.Downloading -> {
-                            Spacer(Modifier.height(12.dp))
-                            LinearProgressIndicator(
-                                progress = { a.progress },
-                                modifier = Modifier.fillMaxWidth(),
-                            )
-                            Spacer(Modifier.height(4.dp))
-                            Text(stringResource(R.string.update_downloading, (a.progress * 100).toInt()))
-                        }
-                        HomeViewModel.UpdateAction.NeedsInstallPermission -> {
-                            Spacer(Modifier.height(8.dp))
-                            Text(stringResource(R.string.update_needs_install_permission))
-                        }
-                        HomeViewModel.UpdateAction.Failed -> {
-                            Spacer(Modifier.height(8.dp))
-                            Text(stringResource(R.string.update_install_failed))
-                        }
-                        else -> {}
-                    }
-                }
-            },
-            confirmButton = {
-                when (updateAction) {
-                    is HomeViewModel.UpdateAction.Downloading -> {
-                        TextButton(onClick = {}, enabled = false) {
-                            Text(stringResource(R.string.update_downloading_short))
-                        }
-                    }
-                    HomeViewModel.UpdateAction.NeedsInstallPermission -> {
-                        TextButton(onClick = { viewModel.openInstallPermissionSettings() }) {
-                            Text(stringResource(R.string.update_grant_permission))
-                        }
-                    }
-                    HomeViewModel.UpdateAction.Failed -> {
-                        // Offer the manual route after an in-app failure.
-                        TextButton(onClick = { openReleasePage(); viewModel.dismissUpdate() }) {
-                            Text(stringResource(R.string.update_open_page))
-                        }
-                    }
-                    else -> {
-                        // Idle: one-tap in-app install when an APK asset exists,
-                        // else fall back to opening the release page.
-                        TextButton(onClick = {
-                            if (hasApk) viewModel.downloadAndInstallUpdate()
-                            else { openReleasePage(); viewModel.dismissUpdate() }
-                        }) {
-                            Text(stringResource(
-                                if (hasApk) R.string.update_download_install else R.string.download
-                            ))
-                        }
-                    }
-                }
-            },
-            dismissButton = {
-                if (downloading == null) {
-                    TextButton(onClick = { viewModel.dismissUpdate() }) { Text(stringResource(R.string.later)) }
-                }
-            },
-        )
     }
 
     Scaffold(
@@ -203,22 +101,6 @@ fun HomeScreen(
             PodroidTopBar(
                 title = stringResource(R.string.app_name),
                 actions = {
-                    IconButton(
-                        onClick = { viewModel.checkForUpdateNow() },
-                        enabled = !checkingForUpdate,
-                    ) {
-                        if (checkingForUpdate) {
-                            androidx.compose.material3.CircularProgressIndicator(
-                                modifier = Modifier.height(20.dp),
-                                strokeWidth = 2.dp,
-                            )
-                        } else {
-                            Icon(
-                                Icons.Default.SystemUpdate,
-                                contentDescription = stringResource(R.string.check_for_updates),
-                            )
-                        }
-                    }
                     IconButton(onClick = onNavigateToSettings) {
                         Icon(Icons.Default.Settings, contentDescription = stringResource(R.string.settings))
                     }
