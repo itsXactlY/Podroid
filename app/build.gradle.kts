@@ -34,14 +34,17 @@ android {
         applicationId = "com.excp.podroid"
         minSdk = 26
         targetSdk = 36
+        // 46 / 1.4.3: the iris pod federates over Tor — the vendored image is the
+        // single binary with tor inside (FROM scratch), iris-pod-start.sh runs
+        // IRIS_RELAY_TRANSPORT=tor. Rootfs otherwise identical to 1.4.2.
         // 45 / 1.4.2: the guest rootfs changed (Daedalus 0.8.1 -> 0.8.2, and
         // the curated skills went from 0 to 100 once build-daedalus-venv.sh
         // started copying skills/ into the agent HOME). Rebuilding the same
         // versionCode would have shipped a materially different app under a
         // number identical to the one already installed — invisible to the
         // in-app updater, and indistinguishable from "nothing happened".
-        versionCode = 45
-        versionName = "1.4.2"
+        versionCode = 46
+        versionName = "1.4.3"
         buildConfigField("String", "QEMU_VERSION", "\"$podroidQemuVersion\"")
         // Self-hosted update manifest (see jackbox/build-box.sh + publish-thebox.sh
         // in mazemaker-mobile). NOT GitHub: itsXactlY/Iris-Messenger is a PRIVATE
