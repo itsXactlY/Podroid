@@ -33,15 +33,15 @@ PODMAN_FLAGS="\
     -e PYTHONIOENCODING=utf-8 \
     -e IRIS_DATA_DIR=/var/lib/iris \
     -e IRIS_TLS_ENABLED=false \
-    -e IRIS_RELAY_TRANSPORT=dht \
+    -e IRIS_RELAY_TRANSPORT=tor \
 "
-# IRIS_RELAY_TRANSPORT=dht: the Podroid pod's reason for existing is
-# torrent-style cross-NAT federation, so it runs the Kademlia DHT-direct
-# transport (not the same-LAN DLM store-and-forward). Peers are paired in-app
-# via handshake URL (Peers panel → persisted federation_peers.json) and the
-# DHT bootstrap node + optional circuit-relay URL come from runtime.env
-# (IRIS_PEER_GATEWAYS_BOOTSTRAP / IRIS_FEDERATION_RELAY_URL), so NO peer
-# address is ever baked into the image (honors the no-hardcoded-IP rule).
+# IRIS_RELAY_TRANSPORT=tor: the Podroid pod's reason for existing is
+# cross-NAT federation from a phone on LTE/CGNAT. The pod publishes itself as a
+# v3 onion (tor is baked into the iris binary) and dials peers' onions — both
+# ends dial OUT, so no port forwarding, no DHT bootstrap node, no relay server.
+# Peers are paired in-app via the handshake URL, which carries the onion
+# (…&gwkey=…&onion=…). Proven phone <-> desktop browser 2026-10-01. Was dht,
+# whose bootstrap node never existed in the field (running DHT-less).
 # IRIS_TLS_ENABLED=false: the Android client (IrisGateway.kt) speaks PLAIN
 # http://127.0.0.1:9091 over the Podroid port-forward. config.yaml bakes
 # tls.enabled=true + mTLS (require_client_cert), which would serve HTTPS and
