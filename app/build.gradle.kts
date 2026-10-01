@@ -34,6 +34,10 @@ android {
         applicationId = "com.excp.podroid"
         minSdk = 26
         targetSdk = 36
+        // 47 / 1.4.4: vendored image bumped to gateway.py 785d34f — a peer that
+        // re-keys (reset, reinstall, simultaneous first-contact) is followed
+        // instead of being dropped forever; parallel Tor outbox + replay-guard
+        // fixes from 1.4.3's window. Same rootfs otherwise.
         // 46 / 1.4.3: the iris pod federates over Tor — the vendored image is the
         // single binary with tor inside (FROM scratch), iris-pod-start.sh runs
         // IRIS_RELAY_TRANSPORT=tor. Rootfs otherwise identical to 1.4.2.
@@ -43,8 +47,8 @@ android {
         // versionCode would have shipped a materially different app under a
         // number identical to the one already installed — invisible to the
         // in-app updater, and indistinguishable from "nothing happened".
-        versionCode = 46
-        versionName = "1.4.3"
+        versionCode = 47
+        versionName = "1.4.4"
         buildConfigField("String", "QEMU_VERSION", "\"$podroidQemuVersion\"")
         // Self-hosted update manifest (see jackbox/build-box.sh + publish-thebox.sh
         // in mazemaker-mobile). NOT GitHub: itsXactlY/Iris-Messenger is a PRIVATE
