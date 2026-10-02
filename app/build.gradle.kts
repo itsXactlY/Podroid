@@ -34,7 +34,8 @@ android {
         applicationId = "com.excp.podroid"
         minSdk = 26
         targetSdk = 36
-        // 48 / 1.4.5: the in-app updater is gone — The Box (dev.mazemaker.thebox)
+        // 48 / 1.4.5: vendored iris image = gateway 4945474 (one in-flight per peer,
+        // user mail only to the hosting gateway). The in-app updater is gone — The Box (dev.mazemaker.thebox)
         // is the family's only updater. No REQUEST_INSTALL_PACKAGES any more.
         // 47 / 1.4.4: vendored image bumped to gateway.py 785d34f — a peer that
         // re-keys (reset, reinstall, simultaneous first-contact) is followed
