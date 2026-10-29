@@ -20,13 +20,18 @@ if [ -f "$CONFIG" ] && [ "$(head -n 1 "$CONFIG")" != "$MARK" ]; then
     exit 0
 fi
 
-MODEL_BASE_URL="https://openrouter.ai/api/v1"
-MODEL_NAME="tencent/hy3:free"
+MODEL_BASE_URL=""
+MODEL_NAME=""
 MODEL_API_KEY=""
 MCP_URL=""
 # pod.env is written by the watcher with every value single-quoted, so sourcing
 # it assigns strings and runs nothing.
 [ -f "$POD_ENV" ] && . "$POD_ENV"
+# The defaults apply to every empty value, not only to a missing pod.env: the
+# watcher writes the MCP URL as soon as it knows the gateway, long before the app
+# has pushed a model, and an empty base_url makes ariadne refuse to start.
+MODEL_BASE_URL="${MODEL_BASE_URL:-https://openrouter.ai/api/v1}"
+MODEL_NAME="${MODEL_NAME:-tencent/hy3:free}"
 
 # YAML double-quoted scalar: backslash and quote escaped, nothing else special.
 q() { printf '"%s"' "$(printf '%s' "$1" | sed 's/\\/\\\\/g; s/"/\\"/g')"; }
