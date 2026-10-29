@@ -1,0 +1,41 @@
+#!/sbin/openrc-run
+# ────────────────────────────────────────────────────────────────────
+# podroid-ariadne — OpenRC init script for Ariadne, the agent running
+# INSIDE the Podroid Alpine VM.
+#
+# This file lives at /etc/init.d/podroid-ariadne inside the guest, injected by
+# build-rootfs.sh from build-rootfs/files/ like every other podroid-* service.
+#
+# Lifecycle:
+#   - start:  /opt/ariadne/start.sh writes config.yaml (configure.sh) and execs
+#             `/opt/ariadne/ariadne --home /opt/ariadne/home --serve 0.0.0.0:8088`
+#             with the per-install bearer key in DD_SERVE_KEY.
+#   - stop:   s-s-d kills ariadne (pidfile /run/podroid-ariadne.pid; start.sh
+#             execs, so the pid is ariadne's own).
+#
+# Ariadne answers HTTP on the guest's :8088. PodroidService adds an implicit
+# loopback-only port forward (host 127.0.0.1:8088 → guest :8088) so the app on
+# the phone reaches it at 127.0.0.1:8088 without crossing the LAN.
+# ────────────────────────────────────────────────────────────────────
+
+name="podroid-ariadne"
+description="Ariadne agent (native C++, serves the app on :8088)"
+
+command="/opt/ariadne/start.sh"
+command_background="yes"
+pidfile="/run/${name}.pid"
+start_stop_daemon_args="--background --make-pidfile --pidfile ${pidfile}"
+output_log="/var/log/${name}.log"
+error_log="/var/log/${name}.log"
+
+depend() {
+    need net
+    after podroid-network podroid-bootstrap
+}
+
+start_pre() {
+    if [ ! -x /opt/ariadne/ariadne ] || [ ! -x /opt/ariadne/start.sh ]; then
+        eerror "ariadne missing at /opt/ariadne — build-ariadne.sh seeds it into the rootfs"
+        return 1
+    fi
+}

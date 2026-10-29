@@ -1,0 +1,42 @@
+#!/sbin/openrc-run
+# ────────────────────────────────────────────────────────────────────
+# podroid-ariadne-mcp — wires the guest Ariadne to the operator's mazemaker
+# memory and model, with NO hardcoded IP.
+#
+# The Mazemaker Android app runs an MCP proxy bound to the AVF/CrosVM TAP
+# interface on port 8790, forwarding MCP JSON-RPC to the operator's desktop
+# mazemaker pod through the QR-paired token+AES+TLS gateway, and serves the
+# model config at /agent-config. From the guest, that proxy sits at the
+# guest's OWN default gateway (the TAP host), so the URL is resolved at runtime.
+#
+# This service runs /opt/ariadne/mcp-mazemaker-watch.sh, which keeps
+# $ARIADNE_HOME/pod.env (model + MCP URL) current and restarts podroid-ariadne
+# when it changes or when the proxy appears after Ariadne booted -- Ariadne
+# connects its MCP servers at start, and the proxy only exists while the app
+# is open. The restart waits for a running turn to finish.
+#
+# Chat works without this; the memory and the pushed model light up when the
+# app is open. So this never blocks Ariadne.
+# ────────────────────────────────────────────────────────────────────
+
+name="podroid-ariadne-mcp"
+description="Wire Ariadne to mazemaker and the pushed model via the app's on-device proxy"
+
+command="/opt/ariadne/mcp-mazemaker-watch.sh"
+command_background="yes"
+pidfile="/run/${name}.pid"
+start_stop_daemon_args="--background --make-pidfile --pidfile ${pidfile}"
+output_log="/var/log/${name}.log"
+error_log="/var/log/${name}.log"
+
+depend() {
+    need net
+    after podroid-network podroid-ariadne
+}
+
+start_pre() {
+    if [ ! -x /opt/ariadne/mcp-mazemaker-watch.sh ]; then
+        eerror "mcp-mazemaker-watch.sh missing at /opt/ariadne/ — build-rootfs.sh seeds it"
+        return 1
+    fi
+}

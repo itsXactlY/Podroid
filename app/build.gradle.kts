@@ -34,6 +34,9 @@ android {
         applicationId = "com.excp.podroid"
         minSdk = 26
         targetSdk = 36
+        // 49 / 1.5.0: the guest's agent is Ariadne (native C++, one static
+        // binary at /opt/ariadne) instead of the Python Daedalus venv; migration
+        // 49.sh carries the app's api_server.key across.
         // 48 / 1.4.5: vendored iris image = gateway 4945474 (one in-flight per peer,
         // user mail only to the hosting gateway). The in-app updater is gone — The Box (dev.mazemaker.thebox)
         // is the family's only updater. No REQUEST_INSTALL_PACKAGES any more.
@@ -50,8 +53,8 @@ android {
         // versionCode would have shipped a materially different app under a
         // number identical to the one already installed — invisible to the
         // in-app updater, and indistinguishable from "nothing happened".
-        versionCode = 48
-        versionName = "1.4.5"
+        versionCode = 49
+        versionName = "1.5.0"
         buildConfigField("String", "QEMU_VERSION", "\"$podroidQemuVersion\"")
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"

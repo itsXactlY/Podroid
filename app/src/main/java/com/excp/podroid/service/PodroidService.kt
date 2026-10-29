@@ -356,12 +356,12 @@ class PodroidService : Service() {
                         rules.add(com.excp.podroid.data.repository.PortForwardRule(IRIS_WS_PORT, IRIS_WS_PORT, "tcp", loopbackOnly = true))
                     }
 
-                    // Always-on Daedalus gateway forward (host 127.0.0.1:8088
-                    // → guest :8088). Loopback-only: the mazemaker app dials
-                    // 127.0.0.1; the gateway serves plain HTTP with API_SERVER_KEY
-                    // auth on the loopback hop, so 0.0.0.0 would expose it to Wi-Fi.
-                    // Seeded here (not only via runtime ctl) so the local daedalus
-                    // agent is reachable on the very first VM boot.
+                    // Always-on agent forward (host 127.0.0.1:8088 → guest :8088,
+                    // where Ariadne serves). Loopback-only: the mazemaker app dials
+                    // 127.0.0.1; the agent serves plain HTTP with a per-install
+                    // bearer key on the loopback hop, so 0.0.0.0 would expose it to
+                    // Wi-Fi. Seeded here (not only via runtime ctl) so the agent is
+                    // reachable on the very first VM boot.
                     if (rules.none { it.hostPort == AGENT_GATEWAY_PORT }) {
                         rules.add(com.excp.podroid.data.repository.PortForwardRule(AGENT_GATEWAY_PORT, AGENT_GATEWAY_PORT, "tcp", loopbackOnly = true))
                     }
@@ -545,11 +545,11 @@ class PodroidService : Service() {
         const val ACTION_STOP    = "com.excp.podroid.action.STOP"
         const val SSH_HOST_PORT  = 9922
 
-        // Daedalus gateway pod (B): native Python daedalus runs inside
-        // the guest on :8088. Loopback-only forward (host 127.0.0.1:8088 →
-        // guest :8088) so the mazemaker Android app reaches the local gateway
-        // without exposing it to the LAN. Plain HTTP + API_SERVER_KEY auth on
-        // the loopback hop, same trust model as the iris pod.
+        // Agent pod: Ariadne (native C++, /opt/ariadne) runs inside the guest
+        // on :8088. Loopback-only forward (host 127.0.0.1:8088 → guest :8088)
+        // so the mazemaker Android app reaches the local agent without exposing
+        // it to the LAN. Plain HTTP + a per-install bearer key on the loopback
+        // hop, same trust model as the iris pod.
         const val AGENT_GATEWAY_PORT = 8088
 
         // iris-messenger pod ports. The pod (localhost/iris-messenger:arm64) binds
