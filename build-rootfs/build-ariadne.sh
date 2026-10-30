@@ -3,7 +3,7 @@
 # build-ariadne.sh — Ariadne as one static aarch64 musl binary for the pod
 # ============================================================================
 # Produces the vendor tarball that build-rootfs.sh seeds into /opt/ariadne
-# inside the Podroid Alpine guest. Ariadne (daedalus-cpp, the C++ harness)
+# inside the Podroid Alpine guest. Ariadne (the C++ harness, itsXactlY/ariadne)
 # replaces the Python Daedalus as the agent in the pod; the surface it serves
 # is the one the app already speaks: /health, /health/detailed, /v1/models and
 # /v1/chat/completions (SSE) on :8088, behind a per-install bearer key.
@@ -19,13 +19,13 @@
 # Static on purpose: the binary needs nothing from the rootfs, so no apk line
 # has to track what it links, and the same file runs on any aarch64 Linux.
 #
-# The source is `git archive` of DAEDALUS_CPP_SRC at DAEDALUS_CPP_REF: tracked
+# The source is `git archive` of ARIADNE_SRC at ARIADNE_REF: tracked
 # files only, so nothing from a working home (config.yaml, state/, logs/) can
 # reach a tarball that ships to devices.
 #
 # Usage:
 #   ./build-ariadne.sh
-#   DAEDALUS_CPP_SRC=/path/to/daedalus-cpp DAEDALUS_CPP_REF=main ./build-ariadne.sh
+#   ARIADNE_SRC=/path/to/ariadne ARIADNE_REF=main ./build-ariadne.sh
 #
 # Runs in an Alpine arm64 container: under qemu-aarch64 (binfmt) on an x86_64
 # host, natively on arm64. The translation units compile in parallel, one
@@ -36,8 +36,8 @@ set -euo pipefail
 
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 OUT_DIR="${OUT_DIR:-$HERE/files/usr/local/share/ariadne}"
-SRC="${DAEDALUS_CPP_SRC:-$HOME/projects/daedalus-cpp}"
-REF="${DAEDALUS_CPP_REF:-main}"
+SRC="${ARIADNE_SRC:-$HOME/projects/ariadne}"
+REF="${ARIADNE_REF:-main}"
 ALPINE_TAG="${ALPINE_TAG:-3.23}"
 
 log()  { printf '\033[1;36m[ariadne]\033[0m %s\n' "$*"; }
@@ -83,4 +83,4 @@ install -m 0755 "$WORK/out/ariadne" "$WORK/pkg/opt/ariadne/ariadne"
 install -m 0644 "$WORK/src/skills/highlight.yaml" "$WORK/pkg/opt/ariadne/skills/highlight.yaml"
 printf '%s\n' "$rev" > "$WORK/pkg/opt/ariadne/REVISION"
 tar --owner=0 --group=0 -C "$WORK/pkg" -cf "$OUT_DIR/ariadne-podroid.tar" opt
-log "wrote $OUT_DIR/ariadne-podroid.tar ($(du -h "$OUT_DIR/ariadne-podroid.tar" | cut -f1), daedalus-cpp $rev)"
+log "wrote $OUT_DIR/ariadne-podroid.tar ($(du -h "$OUT_DIR/ariadne-podroid.tar" | cut -f1), ariadne $rev)"

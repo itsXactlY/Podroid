@@ -115,7 +115,7 @@ cp /work/files/etc/init.d/podroid-migrate   "$ROOTFS/etc/init.d/"
 chmod +x "$ROOTFS/etc/init.d/podroid-"*
 
 # Ariadne: OpenRC init that runs the agent inside the Podroid VM on guest
-# :8088 (native C++, daedalus-cpp). It replaced the Python Daedalus and serves
+# :8088 (native C++, itsXactlY/ariadne). It replaced the Python Daedalus and serves
 # the surface the app already speaks (/health, /v1/chat/completions, bearer
 # key), so PodroidService's port forward is unchanged. The binary lands at
 # /opt/ariadne via the vendor tarball block below; this installs the scripts.
@@ -188,7 +188,7 @@ mkdir -p "$ROOTFS/opt/ariadne"
 if [ -f /work/files/usr/local/share/ariadne/ariadne-podroid.tar ]; then
     tar -xf /work/files/usr/local/share/ariadne/ariadne-podroid.tar -C "$ROOTFS"
     chmod +x "$ROOTFS/opt/ariadne/ariadne"
-    echo "seeded /opt/ariadne (daedalus-cpp $(cat "$ROOTFS/opt/ariadne/REVISION" 2>/dev/null || echo '?'))"
+    echo "seeded /opt/ariadne (ariadne $(cat "$ROOTFS/opt/ariadne/REVISION" 2>/dev/null || echo '?'))"
 else
     echo "WARN: no ariadne-podroid.tar -- run build-rootfs/build-ariadne.sh; the pod ships without an agent"
 fi
