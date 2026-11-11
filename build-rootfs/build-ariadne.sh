@@ -36,7 +36,12 @@ set -euo pipefail
 
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 OUT_DIR="${OUT_DIR:-$HERE/files/usr/local/share/ariadne}"
-SRC="${ARIADNE_SRC:-$HOME/projects/ariadne}"
+# In mazemaker-stack, ariadne sits at agent/ariadne, five levels up from build-rootfs/
+# (mobile/iris-messenger/android/podroid/build-rootfs). A standalone podroid checkout
+# falls back to the stack's usual home; ARIADNE_SRC overrides both.
+_stack_ariadne="$(cd "$HERE/../../../../.." 2>/dev/null && pwd)/agent/ariadne"
+[ -d "$_stack_ariadne/.git" ] || _stack_ariadne="$HOME/projects/mazemaker-stack/agent/ariadne"
+SRC="${ARIADNE_SRC:-$_stack_ariadne}"
 REF="${ARIADNE_REF:-main}"
 ALPINE_TAG="${ALPINE_TAG:-3.23}"
 

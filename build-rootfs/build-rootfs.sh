@@ -136,7 +136,7 @@ if [ -f /work/files/etc/init.d/podroid-sshd ]; then
 fi
 
 # iris-pod: the OpenRC init that runs the iris-messenger container inside
-# the Podroid VM. Source lives in /home/alca/projects/jrwl-messenger/
+# the Podroid VM. Source lives in /home/alca/projects/mazemaker-stack/mobile/iris-messenger/
 # android/vm-image/overlay/etc/init.d/iris-pod (same overlay that builds
 # the iris-messenger-arm64-overlay.tar). Staged here so it ends up in
 # the squashfs at /etc/init.d/iris-pod.
@@ -156,7 +156,7 @@ fi
 # Vendor tarball of the iris-messenger container image (the obfuscated .bin
 # wrapped in a minimal scratch container). iris-pod's start_pre() loads this
 # via `podman load -i` if `localhost/iris-messenger:amd64` is not already
-# present. Sourced from /home/alca/projects/jrwl-messenger/build-podman-image.sh
+# present. Sourced from /home/alca/projects/mazemaker-stack/mobile/iris-messenger/build-podman-image.sh
 # on the host, then mirrored into the Podroid APK assets at
 # app/src/main/assets/iris-messenger/iris-messenger-amd64.tar.
 if [ -f /work/files/usr/local/share/iris/iris-messenger-arm64.tar ]; then

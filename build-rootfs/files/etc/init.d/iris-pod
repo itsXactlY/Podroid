@@ -62,7 +62,7 @@ start_pre() {
     # If the image isn't present yet, try to load it from the vendor
     # tarball that ships inside the Podroid APK at
     # /usr/local/share/iris/iris-messenger-amd64.tar (built by
-    # /home/alca/projects/jrwl-messenger/build-podman-image.sh on the
+    # /home/alca/projects/mazemaker-stack/mobile/iris-messenger/build-podman-image.sh on the
     # host). The tarball is the obfuscated Nuitka .bin wrapped in a
     # minimal scratch container with glibc; podroid-podman runs it
     # directly. ARM64 is a TODO — see build-podman-image.sh.

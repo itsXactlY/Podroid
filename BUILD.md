@@ -44,7 +44,7 @@ After editing the gateway (e.g. `gateway.py`, `dht_discovery.py`, `config.py`)
 or the pod launcher (`build-rootfs/files/usr/local/bin/iris-pod-start.sh`):
 
 ```bash
-cd ~/projects/jrwl-messenger
+cd ~/projects/mazemaker-stack/mobile/iris-messenger
 TAR=android/podroid/build-rootfs/files/usr/local/share/iris/iris-messenger-arm64.tar
 
 # 1) image — COPY . . picks up the source edits (pip layer is cached → ~1 min)

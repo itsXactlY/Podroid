@@ -59,7 +59,7 @@ proxy_reachable() {
         -d '{"jsonrpc":"2.0","id":1,"method":"tools/list"}' 2>/dev/null
 }
 
-# Merge the pushed model into MODEL_*. The push is the Hermes/Daedalus shape:
+# Merge the pushed model into MODEL_*. The push is the shape the Mazemaker app sends:
 # model.provider names an entry in providers, which carries base_url, api_key
 # and default_model; model.default is the model id. A flat model.base_url /
 # model.name / model.api_key is read too. Deliberately conservative: an empty
