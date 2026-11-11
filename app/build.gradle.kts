@@ -56,8 +56,13 @@ android {
         // 50 / 1.5.1: Ariadne rebuilt from main (8a58f98) -- the musl build fixes (fcntl.h, the
         // fatal-signal handler), the gateway's adopt names mazemaker-gateway; Hermes is retired
         // across the stack. Same versionCode would hide the new rootfs from The Box.
-        versionCode = 50
-        versionName = "1.5.1"
+        // 51 / 1.5.2: the guest's agent no longer dies in restart loops. mcp-mazemaker-watch.sh
+        // clobbered its own loop flag (sh has no locals) and restarted Ariadne every poll while
+        // the app's proxy was up; podroid-ariadne's stop did not wait (no retry), so a restart
+        // during startup left the service "crashed" with nothing to bring it back. The watcher
+        // now recovers a crashed agent, and the stop waits (TERM/15/KILL/5).
+        versionCode = 51
+        versionName = "1.5.2"
         buildConfigField("String", "QEMU_VERSION", "\"$podroidQemuVersion\"")
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"

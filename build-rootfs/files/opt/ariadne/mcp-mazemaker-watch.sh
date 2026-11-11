@@ -65,6 +65,11 @@ proxy_reachable() {
 # model.name / model.api_key is read too. Deliberately conservative: an empty
 # field never overwrites a held one -- a phone with no key yet must not wipe a
 # working one. Returns 0 when something changed.
+#
+# sh has no locals: this function's flag must not be called `changed`, which is
+# the main loop's. It was, so "nothing changed" set the loop's changed=1 and
+# every poll with the proxy up rewrote pod.env and restarted Ariadne -- a
+# restart about once a minute, forever (Pixel 7 Pro, 2026-11-11).
 pull_agent_config() {
     gw="$1"; [ -n "$gw" ] || return 1
     body=$(curl -sf -m 8 "http://$gw:$PORT/agent-config" 2>/dev/null) || return 1
@@ -73,17 +78,30 @@ pull_agent_config() {
     base=$(printf '%s' "$body" | jq -r "$sel | \$p.base_url // \$m.base_url // \"\"")
     name=$(printf '%s' "$body" | jq -r "$sel | \$m.default // \$p.default_model // \$m.name // \"\"")
     key=$(printf '%s' "$body" | jq -r "$sel | \$p.api_key // \$m.api_key // \"\"")
-    changed=1
-    if [ -n "$base" ] && [ "$base" != "$MODEL_BASE_URL" ]; then MODEL_BASE_URL="$base"; changed=0; fi
-    if [ -n "$name" ] && [ "$name" != "$MODEL_NAME" ]; then MODEL_NAME="$name"; changed=0; fi
-    if [ -n "$key" ] && [ "$key" != "$MODEL_API_KEY" ]; then MODEL_API_KEY="$key"; changed=0; fi
-    return $changed
+    _pulled=1
+    if [ -n "$base" ] && [ "$base" != "$MODEL_BASE_URL" ]; then MODEL_BASE_URL="$base"; _pulled=0; fi
+    if [ -n "$name" ] && [ "$name" != "$MODEL_NAME" ]; then MODEL_NAME="$name"; _pulled=0; fi
+    if [ -n "$key" ] && [ "$key" != "$MODEL_API_KEY" ]; then MODEL_API_KEY="$key"; _pulled=0; fi
+    return $_pulled
 }
 
 busy() {
     [ -s "$KEY_FILE" ] || return 1
     [ "$(curl -s -m 3 -H "Authorization: Bearer $(cat "$KEY_FILE")" \
         http://127.0.0.1:8088/health/detailed 2>/dev/null | jq -r '.busy // false' 2>/dev/null)" = "true" ]
+}
+
+# OpenRC marks a service "crashed" when its process is gone without a stop -- e.g.
+# a restart that lands while Ariadne is still starting. Nothing else starts it
+# again, so the watcher does: zap the stale state and start it.
+recover_crashed() {
+    case "$(rc-service podroid-ariadne status 2>&1)" in
+        *crashed*)
+            echo "[mcp-watch] podroid-ariadne crashed -- starting it again"
+            rc-service podroid-ariadne zap >/dev/null 2>&1
+            rc-service podroid-ariadne start >/dev/null 2>&1 || true
+            sleep "$SETTLE" ;;
+    esac
 }
 
 restart_ariadne() {
@@ -99,6 +117,7 @@ restart_ariadne() {
 load
 was_up=0
 while :; do
+    recover_crashed
     gw="$(default_gw)"
     changed=0
     if [ -n "$gw" ] && [ "http://$gw:$PORT/mcp" != "$MCP_URL" ]; then

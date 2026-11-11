@@ -25,6 +25,11 @@ command="/opt/ariadne/start.sh"
 command_background="yes"
 pidfile="/run/${name}.pid"
 start_stop_daemon_args="--background --make-pidfile --pidfile ${pidfile}"
+# Without retry, OpenRC's stop sends SIGTERM and returns at once (no --retry), so a
+# restart started the new ariadne while the old one -- still connecting its MCP
+# server, or mid-turn -- held :8088; the new one could not bind and exited, the old
+# one exited on its TERM, and the service was left "crashed" (2026-11-11).
+retry="TERM/15/KILL/5"
 output_log="/var/log/${name}.log"
 error_log="/var/log/${name}.log"
 
