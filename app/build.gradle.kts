@@ -53,8 +53,11 @@ android {
         // versionCode would have shipped a materially different app under a
         // number identical to the one already installed — invisible to the
         // in-app updater, and indistinguishable from "nothing happened".
-        versionCode = 49
-        versionName = "1.5.0"
+        // 50 / 1.5.1: Ariadne rebuilt from main (8a58f98) -- the musl build fixes (fcntl.h, the
+        // fatal-signal handler), the gateway's adopt names mazemaker-gateway; Hermes is retired
+        // across the stack. Same versionCode would hide the new rootfs from The Box.
+        versionCode = 50
+        versionName = "1.5.1"
         buildConfigField("String", "QEMU_VERSION", "\"$podroidQemuVersion\"")
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
