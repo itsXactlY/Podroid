@@ -114,8 +114,34 @@ restart_ariadne() {
     sleep "$SETTLE"
 }
 
+ariadne_pid() { cat /run/podroid-ariadne.pid 2>/dev/null; }
+
+# "Proxy came up" restarts Ariadne only when the running Ariadne started while the
+# proxy was down: it connects its MCP servers once, at start, but its MCP calls are
+# plain POSTs, so a process that had the proxy works again when the proxy returns.
+# One slow probe (tools/list goes through the gateway to the pod; 5 s timeout) used
+# to count as "down", and the next poll restarted an Ariadne that had all its tools
+# -- six restarts in eight minutes on a Pixel 7 Pro (2026-11-11). Now the proxy is
+# down only after DOWN_AFTER failed probes in a row, and the restart is skipped when
+# the process that last had the proxy is still the one running.
+DOWN_AFTER=2
+
+# Ariadne whose MCP connect failed although the proxy answers now (the pod was slow
+# when it started: "mcp: Timeout was reached", 11 tools instead of 47). It says so
+# on stderr just before its "ariadne serve:" banner, so the last start failed when
+# the line before the last banner is the "unavailable" one. Restarted at most once
+# per NO_MCP_EVERY seconds, so a pod that keeps timing out is not hammered.
+ARIADNE_LOG=/var/log/podroid-ariadne.log
+NO_MCP_EVERY=120
+started_without_mcp() {
+    grep -E "^ariadne serve:|mcp server 'mazemaker' unavailable" "$ARIADNE_LOG" 2>/dev/null \
+        | tail -2 | head -1 | grep -q "unavailable"
+}
+last_no_mcp=0
 load
 was_up=0
+fails=0
+linked_pid=""
 while :; do
     recover_crashed
     gw="$(default_gw)"
@@ -126,11 +152,20 @@ while :; do
     fi
     came_up=0
     if proxy_reachable "$gw"; then
+        fails=0
         pull_agent_config "$gw" && changed=1
-        [ "$was_up" = 0 ] && came_up=1
+        if [ "$was_up" = 0 ]; then
+            pid="$(ariadne_pid)"
+            if [ -n "$pid" ] && [ "$pid" = "$linked_pid" ] && kill -0 "$pid" 2>/dev/null; then
+                echo "[mcp-watch] proxy back at $gw:$PORT; ariadne (pid $pid) had it before -- no restart"
+            else
+                came_up=1
+            fi
+        fi
         was_up=1
     else
-        was_up=0
+        fails=$((fails + 1))
+        [ "$fails" -ge "$DOWN_AFTER" ] && was_up=0
     fi
     if [ "$changed" = 1 ]; then
         save
@@ -138,6 +173,14 @@ while :; do
         restart_ariadne "pod.env changed (proxy at ${gw:-?}:$PORT)"
     elif [ "$came_up" = 1 ]; then
         restart_ariadne "proxy up at $gw:$PORT after ariadne started"
+    elif [ "$was_up" = 1 ] && started_without_mcp; then
+        now=$(date +%s)
+        if [ $((now - last_no_mcp)) -ge "$NO_MCP_EVERY" ]; then
+            last_no_mcp=$now
+            restart_ariadne "ariadne started without the mazemaker MCP server; proxy answers at $gw:$PORT"
+        fi
     fi
+    # The Ariadne running now, with the proxy up, has it (or was just restarted to get it).
+    [ "$was_up" = 1 ] && linked_pid="$(ariadne_pid)"
     sleep "$POLL"
 done

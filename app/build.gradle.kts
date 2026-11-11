@@ -61,8 +61,12 @@ android {
         // the app's proxy was up; podroid-ariadne's stop did not wait (no retry), so a restart
         // during startup left the service "crashed" with nothing to bring it back. The watcher
         // now recovers a crashed agent, and the stop waits (TERM/15/KILL/5).
-        versionCode = 51
-        versionName = "1.5.2"
+        // 52 / 1.5.3: the watcher restarts Ariadne only when it lacks the proxy. One slow probe
+        // no longer counts as "proxy down" (2 in a row do), an Ariadne that had the proxy is not
+        // restarted when it returns, and one whose MCP connect failed while the proxy answers
+        // is restarted (at most every 2 min) instead of staying at 11 tools.
+        versionCode = 52
+        versionName = "1.5.3"
         buildConfigField("String", "QEMU_VERSION", "\"$podroidQemuVersion\"")
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
