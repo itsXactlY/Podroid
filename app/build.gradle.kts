@@ -65,8 +65,11 @@ android {
         // no longer counts as "proxy down" (2 in a row do), an Ariadne that had the proxy is not
         // restarted when it returns, and one whose MCP connect failed while the proxy answers
         // is restarted (at most every 2 min) instead of staying at 11 tools.
-        versionCode = 52
-        versionName = "1.5.3"
+        // 53 / 1.5.4: the guest carries a current Iris image (tor-capable binary with the
+        // chat-column UI fix) instead of the July source image, which crash-looped on the
+        // start script's IRIS_RELAY_TRANSPORT=tor, and Ariadne at main.
+        versionCode = 53
+        versionName = "1.5.4"
         buildConfigField("String", "QEMU_VERSION", "\"$podroidQemuVersion\"")
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
