@@ -76,8 +76,11 @@ android {
         // 55 / 1.5.6: the guest's Iris image is Iris main 30866b8 — on top of 1.5.5's chat fixes,
         // tor enters through the Iris doors first, falls back to Snowflake as a second way in,
         // and lyrebird gets CA roots even in images without a system CA bundle (CaRoots).
-        versionCode = 55
-        versionName = "1.5.6"
+        // 56 / 1.5.7: the guest's Iris image is Iris main d5fc171 — a send stuck on a stalled
+        // Tor circuit is hedged onto the always-ready standby after 4 s, so one bad circuit no
+        // longer holds every later message to that peer for up to a minute.
+        versionCode = 56
+        versionName = "1.5.7"
         buildConfigField("String", "QEMU_VERSION", "\"$podroidQemuVersion\"")
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
