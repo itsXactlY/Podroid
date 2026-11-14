@@ -68,8 +68,13 @@ android {
         // 53 / 1.5.4: the guest carries a current Iris image (tor-capable binary with the
         // chat-column UI fix) instead of the July source image, which crash-looped on the
         // start script's IRIS_RELAY_TRANSPORT=tor, and Ariadne at main.
-        versionCode = 53
-        versionName = "1.5.4"
+        // 54 / 1.5.5: the guest's Iris image is Iris main 727de3a. Browser gateway chats no
+        // longer lose or fork their session (an envelope is taken once, a reader that cannot
+        // decrypt re-handshakes by itself, a burst no longer erases ratchet state), accepted
+        // mail survives a pod restart (sqlite store), mail for an unpinned peer stops being
+        // retried forever, and the arm64 tor bundle carries lyrebird (bridges on phones).
+        versionCode = 54
+        versionName = "1.5.5"
         buildConfigField("String", "QEMU_VERSION", "\"$podroidQemuVersion\"")
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
