@@ -73,8 +73,11 @@ android {
         // decrypt re-handshakes by itself, a burst no longer erases ratchet state), accepted
         // mail survives a pod restart (sqlite store), mail for an unpinned peer stops being
         // retried forever, and the arm64 tor bundle carries lyrebird (bridges on phones).
-        versionCode = 54
-        versionName = "1.5.5"
+        // 55 / 1.5.6: the guest's Iris image is Iris main 30866b8 — on top of 1.5.5's chat fixes,
+        // tor enters through the Iris doors first, falls back to Snowflake as a second way in,
+        // and lyrebird gets CA roots even in images without a system CA bundle (CaRoots).
+        versionCode = 55
+        versionName = "1.5.6"
         buildConfigField("String", "QEMU_VERSION", "\"$podroidQemuVersion\"")
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
